@@ -48,13 +48,36 @@ def test_start_graph_span_emits_openinference_attributes(
     assert "ignored" not in span.attributes
 
 
-def test_compact_mode_does_not_store_full_arbitrary_state(
+def test_message_compact_default_does_not_store_full_arbitrary_state(
     span_exporter: InMemorySpanExporter,
 ) -> None:
     with start_graph_span(
         "retrieve",
         "RETRIEVER",
         input={"request": {"text": "do not store this full value"}},
+    ):
+        pass
+
+    span = span_exporter.get_finished_spans()[0]
+
+    assert span.attributes is not None
+    input_value = span.attributes[SpanAttributes.INPUT_VALUE]
+    assert isinstance(input_value, str)
+    assert "do not store this full value" not in input_value
+    # MESSAGE_COMPACT recurses into mappings; scalars are shape-summarized.
+    assert json.loads(input_value) == {
+        "request": {"text": {"type": "str", "length": 28}},
+    }
+
+
+def test_compact_mode_stores_only_shape_summary(
+    span_exporter: InMemorySpanExporter,
+) -> None:
+    with start_graph_span(
+        "retrieve",
+        "RETRIEVER",
+        input={"request": {"text": "do not store this full value"}},
+        mode=TracePayloadMode.COMPACT,
     ):
         pass
 
@@ -96,7 +119,7 @@ def test_set_span_input_accepts_custom_serializer(
     def fixed_serializer(
         value: object,
         *,
-        mode: TracePayloadMode = TracePayloadMode.COMPACT,
+        mode: TracePayloadMode = TracePayloadMode.MESSAGE_COMPACT,
     ) -> str:
         return json.dumps(
             {"custom": type(value).__name__, "mode": mode.value},
@@ -112,18 +135,18 @@ def test_set_span_input_accepts_custom_serializer(
     assert finished_span.attributes is not None
     input_value = finished_span.attributes[SpanAttributes.INPUT_VALUE]
     assert isinstance(input_value, str)
-    assert json.loads(input_value) == {"custom": "dict", "mode": "compact"}
+    assert json.loads(input_value) == {"custom": "dict", "mode": "message_compact"}
 
 
-def test_custom_serializer_can_redact_compact_payloads(
+def test_custom_serializer_can_redact_message_compact_payloads(
     span_exporter: InMemorySpanExporter,
 ) -> None:
     def redacting_serializer(
         value: object,
         *,
-        mode: TracePayloadMode = TracePayloadMode.COMPACT,
+        mode: TracePayloadMode = TracePayloadMode.MESSAGE_COMPACT,
     ) -> str:
-        if mode is TracePayloadMode.COMPACT and isinstance(value, dict):
+        if mode is TracePayloadMode.MESSAGE_COMPACT and isinstance(value, dict):
             return json.dumps(
                 {"type": "mapping", "redacted": "secret" in value},
                 sort_keys=True,

@@ -1,10 +1,10 @@
 # Release And Versioning Notes
 
-Graph Observability Kit will use Semantic Versioning once releases begin.
+Graph Observability Kit uses Semantic Versioning for public releases.
 
-## Initial Version
+## Current Version
 
-`0.1.0` is the first public-ready release.
+`0.2.0` is the current public-ready release.
 
 ## Planned Release Flow
 

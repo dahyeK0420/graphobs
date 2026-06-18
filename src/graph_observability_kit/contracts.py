@@ -5,10 +5,10 @@ from __future__ import annotations
 import logging
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
+from enum import StrEnum
 from types import MappingProxyType
-from typing import Protocol, TypeAlias
+from typing import Literal, Protocol, TypeAlias
 
-from graph_observability_kit._shape_summary import shape_summary
 from graph_observability_kit._state_paths import (
     Path,
     StateMapping,
@@ -24,10 +24,18 @@ from graph_observability_kit._state_paths import (
     split_path,
     state_diff,
 )
+from graph_observability_kit.payloads import shape_summary
 
 LOGGER = logging.getLogger(__name__)
 
 AttributeValue = str | int | float | bool | None
+
+
+class ContractViolationAction(StrEnum):
+    """Controls how contract validation handles undeclared writes."""
+
+    RAISE = "raise"
+    WARN = "warn"
 
 
 class StateContractError(ValueError):
@@ -293,18 +301,67 @@ def project_output(
     return state_diff(before_projection, after_projection)
 
 
+def project_node_payload(
+    contract: Contract,
+    payload: StateMapping,
+    kind: Literal["input", "output"],
+    *,
+    fallback_to_summary: bool = False,
+) -> dict[str, object]:
+    """Projects one input or output payload through a contract policy.
+
+    Args:
+        contract: Contract that declares the payload boundary.
+        payload: Input or output payload to project.
+        kind: Which public contract policy to use.
+        fallback_to_summary: Whether projection failures should return a
+            compact shape summary instead of raising.
+
+    Returns:
+        A projected payload, or a compact summary when fallback is enabled and
+        projection fails.
+
+    Raises:
+        ValueError: If ``kind`` is not a supported payload direction.
+        Exception: Re-raises projection errors when fallback is disabled.
+    """
+    if kind not in ("input", "output"):
+        raise ValueError(f"unsupported payload kind: {kind!r}")
+
+    try:
+        if kind == "input":
+            return contract.input_policy.project(payload)
+        return contract.output_policy.project(payload)
+    except Exception as exc:
+        if not fallback_to_summary:
+            raise
+        LOGGER.warning(
+            "Could not project %s payload for contract %s; "
+            "using compact summary after %s: %s",
+            kind,
+            contract.label,
+            type(exc).__name__,
+            exc,
+        )
+        return {f"{kind}_summary": shape_summary(payload)}
+
+
 def validate_update(
     contract: Contract,
     update: StateUpdate,
+    *,
+    on_violation: ContractViolationAction = ContractViolationAction.RAISE,
 ) -> None:
     """Validates that an update only writes declared paths.
 
     Args:
         contract: Contract that declares allowed public and private writes.
         update: State update returned by a node or subgraph.
+        on_violation: Whether undeclared writes raise or log a warning.
 
     Raises:
-        StateContractError: If any update path is not declared by the contract.
+        StateContractError: If any update path is not declared by the contract
+            and ``on_violation`` is ``ContractViolationAction.RAISE``.
     """
     undeclared = [
         join_path(path)
@@ -315,6 +372,9 @@ def validate_update(
     ]
     if undeclared:
         error = StateContractError(contract.label, undeclared)
+        if on_violation == ContractViolationAction.WARN:
+            LOGGER.warning("%s", error)
+            return
         LOGGER.error("%s", error)
         raise error
 
@@ -383,11 +443,13 @@ def _path_allowed_by_policy(path: Path, policy: ProjectionPolicy) -> bool:
 
 __all__ = [
     "Contract",
+    "ContractViolationAction",
     "NodeContract",
     "ProjectionPolicy",
     "StateContractError",
     "SubgraphContract",
     "project_input",
+    "project_node_payload",
     "project_output",
     "state_diff",
     "validate_update",

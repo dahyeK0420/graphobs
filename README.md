@@ -2,9 +2,9 @@
 
 Graph Observability Kit is a Python library for contract-first observability in graph-based applications. It helps teams describe graph state boundaries once, then reuse those declarations for trace payloads, structured logs, and validation.
 
-The `0.1.0` release is intentionally small. It includes the core contract model,
-LangGraph integration helpers, backend-portable tracing helpers, and structured
-logging helpers.
+The `0.2.0` release is intentionally small. It includes the core contract model,
+LangGraph integration helpers, callback payload projection, backend-portable
+tracing helpers, and structured logging helpers.
 
 ## Why This Exists
 
@@ -25,8 +25,8 @@ scratch state, or whether a node wrote a key it should not own.
 
 If your graph has fewer than three nodes or no noisy shared state, this library
 may be more structure than you need. If traces are full of whole-state dumps,
-private scratch values, or inconsistent node payloads, start by wrapping one
-node and migrate outward.
+private scratch values, or inconsistent node payloads, start with callback
+payload projection or one contract and migrate outward.
 
 ## Why Not Agent Contracts Or PII Middleware?
 
@@ -121,8 +121,31 @@ public_input = project_input(contract, state)
 
 The contract model is plain Python and has no graph runtime dependency.
 
-LangGraph users can wrap a node without changing the node's business logic. The
-decorator form is the shortest adoption path:
+For an existing LangGraph app, choose the adoption path by risk:
+
+- Want cleaner callback payloads without changing execution? Start with
+  `project_callback_payloads`.
+- Want enforcement while preserving current node behavior? Use
+  `contract_node(..., pass_through_state=True, audit_reads=True,
+  on_violation=ContractViolationAction.WARN)`.
+- Want strict contract-shaped execution for a stable node? Use the default
+  `contract_node` wrapper.
+
+Callback projection is the lowest-risk migration path because the node still
+receives the graph state LangGraph would normally provide:
+
+```python
+from graph_observability_kit.callbacks import project_callback_payloads
+
+config = {
+    "callbacks": [
+        project_callback_payloads(callback, [classify_contract], diagnostics=True),
+    ],
+}
+```
+
+The strict LangGraph wrapper projects the node's execution input before the
+node runs:
 
 ```python
 from graph_observability_kit import NodeContract, contract_node
@@ -138,10 +161,12 @@ def classify(state):
     return {"classification": {"label": "question"}}
 ```
 
-You can also wrap at registration time:
+For migration guardrails without execution filtering, wrap at registration time
+with pass-through execution and read auditing:
 
 ```python
 from graph_observability_kit import NodeContract, contract_node
+from graph_observability_kit.contracts import ContractViolationAction
 
 classify_contract = NodeContract(
     name="classify",
@@ -149,7 +174,16 @@ classify_contract = NodeContract(
     writes=("classification.label",),
 )
 
-graph.add_node("classify", contract_node(classify, classify_contract))
+graph.add_node(
+    "classify",
+    contract_node(
+        classify,
+        classify_contract,
+        pass_through_state=True,
+        audit_reads=True,
+        on_violation=ContractViolationAction.WARN,
+    ),
+)
 ```
 
 Tracing helpers emit OpenTelemetry spans with OpenInference semantic attributes.
@@ -203,7 +237,7 @@ See [docs/concepts/public-neutrality.md](docs/concepts/public-neutrality.md) for
 - [Backend Portability With OTel And OpenInference](docs/concepts/backend-portability.md)
 - [Migrate One Node At A Time](docs/guides/migration-one-node-at-a-time.md)
 - [Medium Companion](docs/articles/medium-companion.md)
-- [0.1.0 Release Notes](docs/releases/v0.1.0.md)
+- [0.2.0 Release Notes](docs/releases/v0.2.0.md)
 - [Contracts API Reference](docs/reference/contracts.md)
 - [LangGraph API Reference](docs/reference/langgraph.md)
 - [Logging API Reference](docs/reference/logging.md)

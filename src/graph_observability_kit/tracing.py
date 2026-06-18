@@ -15,7 +15,7 @@ from opentelemetry import trace
 from opentelemetry.trace import Span, Status, StatusCode
 from opentelemetry.util.types import AttributeValue
 
-from graph_observability_kit._shape_summary import shape_summary
+from graph_observability_kit.payloads import message_compact_summary, shape_summary
 
 LOGGER = logging.getLogger(__name__)
 TRACER_NAME = "graph_observability_kit"
@@ -26,6 +26,7 @@ class TracePayloadMode(StrEnum):
     """Controls how input and output values are serialized into spans."""
 
     COMPACT = "compact"
+    MESSAGE_COMPACT = "message_compact"
     FULL = "full"
 
 
@@ -36,7 +37,7 @@ class PayloadSerializer(Protocol):
         self,
         value: object,
         *,
-        mode: TracePayloadMode = TracePayloadMode.COMPACT,
+        mode: TracePayloadMode = TracePayloadMode.MESSAGE_COMPACT,
     ) -> str:
         """Serializes a payload for an OpenInference span attribute.
 
@@ -52,13 +53,15 @@ class PayloadSerializer(Protocol):
 def default_payload_serializer(
     value: object,
     *,
-    mode: TracePayloadMode = TracePayloadMode.COMPACT,
+    mode: TracePayloadMode = TracePayloadMode.MESSAGE_COMPACT,
 ) -> str:
     """Serializes a payload with the package default trace policy.
 
-    Compact mode records structural summaries instead of arbitrary values.
-    Full mode records complete JSON-compatible values and raises when the
-    payload cannot be represented as JSON.
+    Message-compact mode (the default) preserves role and truncated content
+    for message-shaped values and uses structural summaries for all others.
+    Compact mode records structural summaries for all values. Full mode
+    records complete JSON-compatible values and raises when the payload
+    cannot be represented as JSON.
 
     Args:
         value: Payload value to serialize.
@@ -72,7 +75,9 @@ def default_payload_serializer(
         ValueError: If ``mode`` is not supported.
     """
     prepared: object
-    if mode is TracePayloadMode.COMPACT:
+    if mode is TracePayloadMode.MESSAGE_COMPACT:
+        prepared = message_compact_summary(value)
+    elif mode is TracePayloadMode.COMPACT:
         prepared = shape_summary(value)
     elif mode is TracePayloadMode.FULL:
         prepared = value
@@ -91,7 +96,7 @@ def start_graph_span(
     attributes: Mapping[str, object] | None = None,
     context: otel_context.Context | None = None,
     *,
-    mode: TracePayloadMode = TracePayloadMode.COMPACT,
+    mode: TracePayloadMode = TracePayloadMode.MESSAGE_COMPACT,
     serializer: PayloadSerializer | None = None,
 ) -> Iterator[Span]:
     """Starts a graph span with OpenInference-compatible attributes.
@@ -130,7 +135,7 @@ def set_span_input(
     span: Span,
     value: object,
     *,
-    mode: TracePayloadMode = TracePayloadMode.COMPACT,
+    mode: TracePayloadMode = TracePayloadMode.MESSAGE_COMPACT,
     serializer: PayloadSerializer | None = None,
 ) -> None:
     """Sets the OpenInference input payload attributes on a span.
@@ -156,7 +161,7 @@ def set_span_output(
     span: Span,
     value: object,
     *,
-    mode: TracePayloadMode = TracePayloadMode.COMPACT,
+    mode: TracePayloadMode = TracePayloadMode.MESSAGE_COMPACT,
     serializer: PayloadSerializer | None = None,
 ) -> None:
     """Sets the OpenInference output payload attributes on a span.

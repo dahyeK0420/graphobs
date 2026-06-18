@@ -8,9 +8,10 @@ The project helps users align three related surfaces:
 - Trace payloads that show curated inputs, outputs, attributes, and errors.
 - Structured logs that record lifecycle events and correlation fields.
 
-The `0.1.0` package contains the public repository foundation, the core typed
-contract model, LangGraph integration helpers, backend-portable tracing helpers,
-structured logging helpers, and neutral runnable examples.
+The `0.2.0` package contains the public repository foundation, the core typed
+contract model, LangGraph integration helpers, callback payload projection,
+backend-portable tracing helpers, structured logging helpers, and neutral
+runnable examples.
 
 ## Quickstart
 
@@ -57,6 +58,10 @@ attributes for span kind, input value, and output value. Payloads are compact by
 default.
 
 ## Minimal LangGraph Node
+
+For existing graphs, start with callback payload projection when you only need
+cleaner traces and callback payloads. Use `contract_node` when you are ready for
+execution-time contract guardrails.
 
 ```python
 from graph_observability_kit import NodeContract, contract_node

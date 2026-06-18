@@ -29,7 +29,70 @@ classify_contract = NodeContract(
 The contract says what the node may read, what it may write, and what span kind
 the wrapper should use.
 
-## 3. Decorate The Existing Function
+## 3. Choose The First Integration Mode
+
+For existing graphs, start with the least invasive mode that answers your
+current question:
+
+| Goal | Start here | Execution changes? |
+| --- | --- | --- |
+| Cleaner callback payloads only | `project_callback_payloads` | No |
+| Contract warnings without behavior changes | `contract_node(..., pass_through_state=True, audit_reads=True)` | No input filtering |
+| Strict contract-shaped execution | default `contract_node` | Yes |
+
+### Callback Projection Only
+
+Use callback projection when the node should continue receiving the same state
+as before, but downstream callbacks should see contract-projected payloads:
+
+```python
+from graph_observability_kit.callbacks import project_callback_payloads
+
+config = {
+    "callbacks": [
+        project_callback_payloads(
+            callback,
+            [classify_contract],
+            diagnostics=True,
+        ),
+    ],
+}
+```
+
+The wrapper matches LangGraph node events by `metadata["langgraph_node"]`.
+Set `diagnostics=True` during migration and inspect `projection_stats()` when
+subgraphs or custom node names might change the metadata value.
+
+### Pass-Through Execution With Audits
+
+Use pass-through mode when an existing node may read fallback keys or
+namespace-managed state that is not fully declared yet:
+
+```python
+from graph_observability_kit import contract_node
+from graph_observability_kit.contracts import ContractViolationAction
+
+graph.add_node(
+    "classify",
+    contract_node(
+        classify,
+        classify_contract,
+        pass_through_state=True,
+        audit_reads=True,
+        on_violation=ContractViolationAction.WARN,
+    ),
+)
+```
+
+The node receives the original state, while span input and output stay
+contract-projected. `audit_reads=True` logs undeclared read paths without
+logging state values. `on_violation=ContractViolationAction.WARN` logs
+undeclared writes while you are still refining the contract.
+
+### Strict Projected Execution
+
+Use strict mode once the boundary is stable or when you want the contract to
+shape what the node receives:
 
 ```python
 from graph_observability_kit import contract_node
@@ -40,8 +103,8 @@ def classify(state):
     return {"classification": {"label": "question"}}
 ```
 
-The decorated node receives the projected execution input. It returns the same
-kind of state update LangGraph expects.
+The decorated node receives only declared public reads plus declared private
+reads. It returns the same kind of state update LangGraph expects.
 
 If you prefer to leave the function definition untouched, wrap at registration
 time instead:
@@ -51,6 +114,36 @@ from graph_observability_kit import contract_node
 
 graph.add_node("classify", contract_node(classify, classify_contract))
 ```
+
+The convenience helper registers the node with `contract.label`, which is the
+same value supplied as `NodeContract(name=...)`:
+
+```python
+from graph_observability_kit import add_contract_node
+
+add_contract_node(graph, classify_contract, classify)
+```
+
+Use this form when the graph node name should come directly from the contract.
+
+During early adoption, you can log undeclared writes and continue instead of
+raising immediately:
+
+```python
+from graph_observability_kit.contracts import ContractViolationAction
+
+graph.add_node(
+    "classify",
+    contract_node(
+        classify,
+        classify_contract,
+        on_violation=ContractViolationAction.WARN,
+    ),
+)
+```
+
+Warning mode logs the same `StateContractError` message that raise mode would
+emit. The default remains `ContractViolationAction.RAISE`.
 
 ## 4. Run The Graph
 
@@ -86,11 +179,30 @@ curated span shape.
 Add contracts to adjacent nodes once the first boundary is stable. Keep each
 contract small and review payload shape before using full payload mode.
 
+## Namespaces And Custom Reducers
+
+Graphs that use custom reducers often write a top-level namespace key whose
+nested shape is owned by reducer logic. During migration, prefer one of these
+patterns:
+
+- Declare the reducer-owned namespace broadly, such as `writes=("tools",)`, when
+  nested marker keys are implementation details of the reducer.
+- Use `private_writes` for local namespace state that should be validated but
+  not projected publicly.
+- Start with `on_violation=ContractViolationAction.WARN` while confirming which
+  reducer marker keys appear in real updates.
+- Use `ProjectionPolicy(..., summarize=(...))` for heavy namespace paths where
+  shape is useful but full values are noisy.
+
+Strict dotted write paths are best for stable public state. Broad namespace
+paths are often clearer for reducer-managed state that changes as one unit.
+
 ## Quick Check
 
-The first contract-wrapped node is complete when:
+The first migrated node is complete when:
 
-- The node receives only declared reads and private reads.
+- Callback projection or pass-through mode preserves existing graph behavior.
+- Strict mode nodes receive only declared reads and private reads.
 - The node returns only declared writes and private writes.
 - Compact span input and output are useful without full state dumps.
 - Existing graph behavior still passes its tests.

@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from time import perf_counter_ns
 from typing import TypedDict
 
-from graph_observability_kit._shape_summary import shape_summary
+from graph_observability_kit.payloads import shape_summary
 
 CorrelationValue = str | int | float | bool
 Metadata = Mapping[str, object]

@@ -19,5 +19,5 @@ tasks/*
 .cursor/*
 .claude/*
 .windsurf/*
-un.lock
-py.typed
+uv.lock
+trace_snippet.json

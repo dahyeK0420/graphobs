@@ -28,6 +28,12 @@ how long it took, whether it failed, and which session or request it belongs to.
 Use the same `LogContext.as_attributes()` values on spans when logs and traces
 should share correlation fields.
 
+LangGraph node callbacks may receive the graph runtime's outer chain payload
+even when a node is wrapped with a contract. Use
+`graph_observability_kit.callbacks.project_callback_payloads` around callbacks
+that should see the contract-projected node input and output instead. Root graph
+events and unknown nodes pass through unchanged.
+
 ## Traces
 
 Traces show execution flow. A span can capture timing, a span kind, curated input, curated output, searchable attributes, and errors.
@@ -55,8 +61,8 @@ input/output payloads.
 A contract-first approach asks what each boundary may expose before deciding what to record. That keeps debugging useful while reducing accidental payload sprawl.
 
 Contracts make the same decision reusable: the declared reads and writes can
-shape node execution, validation, and trace payloads. Logs stay focused on
-events and correlation.
+shape node execution, validation, trace payloads, and projected callback
+payloads. Logs stay focused on events and correlation.
 
 ## Public And Private State
 

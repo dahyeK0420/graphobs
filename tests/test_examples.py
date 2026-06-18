@@ -47,10 +47,7 @@ def test_contract_spans_are_clean_and_compact(example: str) -> None:
 
     assert [span["name"] for span in contract_spans] == EXPECTED_CONTRACT_SPANS[example]
     assert all(span["status"] == "UNSET" for span in contract_spans)
-    assert all(
-        cast(dict[str, object], span["input"])["type"] == "mapping"
-        for span in contract_spans
-    )
+    assert all(isinstance(span["input"], dict) for span in contract_spans)
     assert RAW_MARKERS[example] in json.dumps(payload["raw"], sort_keys=True)
     assert RAW_MARKERS[example] not in json.dumps(contract_spans, sort_keys=True)
 

@@ -6,9 +6,17 @@ This project follows Semantic Versioning once public releases begin.
 
 ## Unreleased
 
+## 0.2.0 - 2026-06-18
+
 - Breaking: narrow package-root exports to the headline interface and keep
   lower-level primitives available from their focused submodules.
 - Extract shared dotted state path and diff operations into one internal module.
+- Add callback payload projection helpers with match diagnostics.
+- Add contract discovery helpers for synthetic sample states.
+- Add pass-through node execution and read auditing guardrails for migrations.
+- Ship `py.typed` for typed downstream consumers.
+- Document callback-first migration, reducer-managed namespaces, and heavy-path
+  summarization.
 
 ## 0.1.0 - 2026-06-17
 

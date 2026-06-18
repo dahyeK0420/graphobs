@@ -1,16 +1,19 @@
 from __future__ import annotations
 
 import logging
+from typing import cast
 
 import pytest
 
 from graph_observability_kit.contracts import (
     Contract,
+    ContractViolationAction,
     NodeContract,
     ProjectionPolicy,
     StateContractError,
     SubgraphContract,
     project_input,
+    project_node_payload,
     project_output,
     state_diff,
     validate_update,
@@ -114,6 +117,53 @@ def test_node_projects_changed_public_writes_only() -> None:
     }
 
 
+def test_project_node_payload_projects_input_or_output() -> None:
+    contract = NodeContract(
+        name="answer",
+        reads=("request.text",),
+        writes=("answer.text",),
+    )
+
+    assert project_node_payload(
+        contract,
+        {"request": {"text": "hello", "raw": "hidden"}},
+        "input",
+    ) == {"request": {"text": "hello"}}
+    assert project_node_payload(
+        contract,
+        {"answer": {"text": "done", "debug": "hidden"}},
+        "output",
+    ) == {"answer": {"text": "done"}}
+
+
+def test_project_node_payload_can_fall_back_to_summary(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    caplog.set_level(logging.WARNING, logger="graph_observability_kit.contracts")
+    contract = cast(Contract, ContractWithFailingPolicies())
+    payload = {"request": {"text": "hello", "raw": "hidden"}}
+
+    assert project_node_payload(
+        contract,
+        payload,
+        "input",
+        fallback_to_summary=True,
+    ) == {"input_summary": {"type": "mapping", "size": 1, "keys": ["request"]}}
+    assert caplog.records[0].levelno == logging.WARNING
+    assert (
+        "Could not project input payload for contract failing; "
+        "using compact summary after RuntimeError: synthetic projection failure"
+    ) in caplog.messages
+    assert "hidden" not in caplog.text
+
+
+def test_project_node_payload_raises_projection_errors_by_default() -> None:
+    contract = cast(Contract, ContractWithFailingPolicies())
+
+    with pytest.raises(RuntimeError, match="synthetic projection failure"):
+        project_node_payload(contract, {"request": "hello"}, "input")
+
+
 def test_state_diff_reports_changed_after_state_paths_only() -> None:
     assert state_diff(
         {"answer": {"text": "old", "score": 1}, "removed": "before"},
@@ -162,6 +212,23 @@ def test_validate_update_logs_hard_error_with_original_message(
 
     assert caplog.records[0].levelno == logging.ERROR
     assert caplog.messages == [str(error.value)]
+
+
+def test_validate_update_can_warn_and_continue(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    caplog.set_level(logging.WARNING, logger="graph_observability_kit.contracts")
+    contract = NodeContract(name="retrieve", writes=("documents",))
+    expected_error = StateContractError("retrieve", ("debug.enabled",))
+
+    validate_update(
+        contract,
+        {"debug": {"enabled": True}},
+        on_violation=ContractViolationAction.WARN,
+    )
+
+    assert caplog.records[0].levelno == logging.WARNING
+    assert caplog.messages == [str(expected_error)]
 
 
 def test_projection_policy_excludes_and_summarizes_nested_state() -> None:
@@ -253,3 +320,16 @@ def test_subgraph_validate_update_rejects_undeclared_writes() -> None:
 
     assert error.value.contract_name == "worker_subgraph"
     assert error.value.undeclared_paths == ("metrics.count",)
+
+
+class FailingProjectionPolicy:
+    def project(self, state: object) -> dict[str, object]:
+        raise RuntimeError("synthetic projection failure")
+
+
+class ContractWithFailingPolicies:
+    label = "failing"
+    input_policy = FailingProjectionPolicy()
+    output_policy = FailingProjectionPolicy()
+    execution_input_policies = (ProjectionPolicy(include=("request.text",)),)
+    write_policies = (ProjectionPolicy(include=("answer.text",)),)

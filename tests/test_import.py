@@ -4,7 +4,7 @@ import graph_observability_kit
 
 
 def test_package_imports() -> None:
-    assert graph_observability_kit.__version__ == "0.1.0"
+    assert graph_observability_kit.__version__ == "0.2.0"
 
 
 def test_package_root_exports_headline_interface_only() -> None:
@@ -29,15 +29,28 @@ def test_package_root_exports_headline_interface_only() -> None:
 
 
 def test_deep_apis_remain_available_from_submodules() -> None:
+    from graph_observability_kit.callbacks import (
+        ProjectedCallbackHandler,
+        ProjectionStats,
+        project_callback_payloads,
+    )
     from graph_observability_kit.contracts import (
         Contract,
+        ContractViolationAction,
         ProjectionPolicy,
         StateContractError,
         SubgraphContract,
         project_input,
+        project_node_payload,
         project_output,
         state_diff,
         validate_update,
+    )
+    from graph_observability_kit.discovery import (
+        ContractDiscoveryError,
+        DiscoveredContract,
+        adiscover_contract,
+        discover_contract,
     )
     from graph_observability_kit.langgraph import (
         AsyncInvokableGraph,
@@ -51,6 +64,7 @@ def test_deep_apis_remain_available_from_submodules() -> None:
         GraphLogCallback,
         LogContext,
     )
+    from graph_observability_kit.payloads import shape_summary
     from graph_observability_kit.tracing import (
         PayloadSerializer,
         TracePayloadMode,
@@ -64,25 +78,35 @@ def test_deep_apis_remain_available_from_submodules() -> None:
 
     assert AsyncInvokableGraph.__name__ == "AsyncInvokableGraph"
     assert Contract.__name__ == "Contract"
+    assert ContractDiscoveryError.__name__ == "ContractDiscoveryError"
+    assert ContractViolationAction.WARN.value == "warn"
     assert CorrelationFields.__name__ == "CorrelationFields"
+    assert DiscoveredContract.__name__ == "DiscoveredContract"
     assert GraphLogCallback.__name__ == "GraphLogCallback"
     assert InvokableGraph.__name__ == "InvokableGraph"
     assert LogContext.__name__ == "LogContext"
     assert NodeBuilder.__name__ == "NodeBuilder"
     assert PayloadSerializer.__name__ == "PayloadSerializer"
+    assert ProjectionStats.__name__ == "ProjectionStats"
+    assert ProjectedCallbackHandler.__name__ == "ProjectedCallbackHandler"
     assert ProjectionPolicy.__name__ == "ProjectionPolicy"
     assert issubclass(StateContractError, ValueError)
     assert SubgraphContract.__name__ == "SubgraphContract"
     assert TracePayloadMode.COMPACT.value == "compact"
+    assert callable(adiscover_contract)
     assert callable(contract_subgraph)
     assert callable(default_payload_serializer)
+    assert callable(discover_contract)
     assert callable(langgraph_input_schema)
     assert callable(mark_span_error)
+    assert callable(project_callback_payloads)
     assert callable(project_input)
+    assert callable(project_node_payload)
     assert callable(project_output)
     assert callable(set_span_attributes)
     assert callable(set_span_input)
     assert callable(set_span_output)
+    assert callable(shape_summary)
     assert callable(state_diff)
     assert callable(start_graph_span)
     assert callable(validate_update)
@@ -91,13 +115,23 @@ def test_deep_apis_remain_available_from_submodules() -> None:
 def test_removed_names_are_not_available_from_package_root() -> None:
     removed_names = (
         "Contract",
+        "ContractViolationAction",
+        "ContractDiscoveryError",
         "CorrelationFields",
+        "DiscoveredContract",
         "GraphLogCallback",
         "ProjectionPolicy",
+        "ProjectionStats",
+        "ProjectedCallbackHandler",
         "StateContractError",
         "SubgraphContract",
         "TracePayloadMode",
+        "adiscover_contract",
+        "discover_contract",
+        "project_callback_payloads",
         "project_input",
+        "project_node_payload",
+        "shape_summary",
         "start_graph_span",
         "state_diff",
     )
