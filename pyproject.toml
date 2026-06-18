@@ -1,0 +1,80 @@
+[build-system]
+requires = ["hatchling>=1.26"]
+build-backend = "hatchling.build"
+
+[project]
+name = "graph-observability-kit"
+version = "0.1.0"
+description = "Contract-first observability helpers for graph-based Python applications."
+readme = "README.md"
+requires-python = ">=3.11"
+license = "Apache-2.0"
+keywords = [
+  "graph",
+  "observability",
+  "opentelemetry",
+  "openinference",
+  "tracing",
+]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: Apache Software License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+  "Typing :: Typed",
+]
+dependencies = [
+    "langgraph>=1.2.5",
+    "openinference-semantic-conventions>=0.1.30",
+    "opentelemetry-api>=1.42.1",
+]
+
+[project.optional-dependencies]
+demo = [
+    "arize-phoenix>=8",
+    "ipykernel>=6",
+    "jupyterlab>=4",
+    "opentelemetry-exporter-otlp-proto-http>=1.42.1",
+    "opentelemetry-sdk>=1.42.1",
+    "python-dotenv>=1",
+]
+
+[dependency-groups]
+dev = [
+  "build>=1.2.2",
+  "mkdocs-material>=9.5",
+  "mkdocstrings[python]>=0.27",
+  "mypy>=1.14",
+  "nbmake>=1.5",
+  "opentelemetry-sdk>=1.42.1",
+  "pytest>=8.3",
+  "ruff>=0.8",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/graph_observability_kit"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py311"
+extend-exclude = [".uv-cache", ".venv", "build", "dist", "outputs", "site", "work"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+packages = ["graph_observability_kit"]
+
+[tool.pytest.ini_options]
+addopts = "-q"
+testpaths = ["tests"]
+
+[[tool.uv.index]]
+url = "https://pypi.org/simple"
+default = true

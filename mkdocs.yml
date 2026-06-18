@@ -1,0 +1,63 @@
+site_name: Graph Observability Kit
+site_description: Contract-first observability helpers for graph-based Python applications.
+repo_name: graph-observability-kit
+
+theme:
+  name: material
+  features:
+    - navigation.indexes
+    - toc.integrate
+
+plugins:
+  - search
+  - mkdocstrings:
+      default_handler: python
+      handlers:
+        python:
+          paths:
+            - src
+          options:
+            docstring_style: google
+            show_if_no_docstring: false
+            show_root_heading: true
+            show_source: true
+            heading_level: 2
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+
+nav:
+  - Home: index.md
+  - Tutorials:
+      - Quickstart: tutorials/quickstart.md
+  - Architecture: architecture.md
+  - Examples: examples.md
+  - Concepts:
+      - State, Logs, And Traces: concepts/state-logs-traces.md
+      - Public Vs Private State: concepts/public-vs-private-state.md
+      - Designing Node Contracts: concepts/designing-node-contracts.md
+      - Payload Safety And Redaction: concepts/payload-safety-redaction.md
+      - Backend Portability: concepts/backend-portability.md
+      - Public Neutrality: concepts/public-neutrality.md
+  - Guides:
+      - Overview: guides/index.md
+      - Migrate One Node At A Time: guides/migration-one-node-at-a-time.md
+  - Articles:
+      - Overview: articles/index.md
+      - Medium Companion: articles/medium-companion.md
+  - Releases:
+      - Overview: releases/index.md
+      - 0.1.0: releases/v0.1.0.md
+  - Release And Versioning: release-versioning.md
+  - API Reference:
+      - Overview: reference/index.md
+      - Package: reference/package.md
+      - Contracts: reference/contracts.md
+      - LangGraph: reference/langgraph.md
+      - Logging: reference/logging.md
+      - Tracing: reference/tracing.md
+      - Demo: reference/demo.md

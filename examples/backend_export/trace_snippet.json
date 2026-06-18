@@ -1,0 +1,184 @@
+{
+  "backend_setup": {
+    "exporters": [
+      "InMemorySpanExporter",
+      "ConsoleSpanExporter"
+    ],
+    "network": "none",
+    "span_processor": "SimpleSpanProcessor"
+  },
+  "console_exporter_lines": [
+    {
+      "input": {
+        "request": {
+          "raw_notes": "raw exporter setup notes",
+          "text": "Show a local exporter"
+        },
+        "scratch": {
+          "preview": "console exporter dry run"
+        }
+      },
+      "kind": "CHAIN",
+      "name": "raw_backend_export",
+      "output": {
+        "answer": {
+          "text": "Local export prepared for: Show a local exporter"
+        },
+        "request": {
+          "raw_notes": "raw exporter setup notes",
+          "text": "Show a local exporter"
+        },
+        "scratch": {
+          "preview": "console exporter dry run"
+        }
+      },
+      "status": "UNSET"
+    },
+    {
+      "attributes": {
+        "graph.node": "prepare_answer"
+      },
+      "input": {
+        "keys": [
+          "request"
+        ],
+        "size": 1,
+        "type": "mapping"
+      },
+      "kind": "CHAIN",
+      "name": "prepare_answer",
+      "output": {
+        "keys": [
+          "answer"
+        ],
+        "size": 1,
+        "type": "mapping"
+      },
+      "status": "UNSET"
+    }
+  ],
+  "contract_wrapped": {
+    "answer": {
+      "text": "Local export prepared for: Show a local exporter"
+    },
+    "spans": [
+      {
+        "attributes": {
+          "graph.node": "prepare_answer"
+        },
+        "input": {
+          "keys": [
+            "request"
+          ],
+          "size": 1,
+          "type": "mapping"
+        },
+        "kind": "CHAIN",
+        "name": "prepare_answer",
+        "output": {
+          "keys": [
+            "answer"
+          ],
+          "size": 1,
+          "type": "mapping"
+        },
+        "status": "UNSET"
+      }
+    ]
+  },
+  "example": "backend_export",
+  "logs": [
+    {
+      "event": "chain_start",
+      "input_summary": {
+        "keys": [
+          "request",
+          "scratch"
+        ],
+        "size": 2,
+        "type": "mapping"
+      },
+      "request_id": "request-1",
+      "run_kind": "chain",
+      "run_name": "backend_export_contract",
+      "session_id": "example-session"
+    },
+    {
+      "event": "chain_end",
+      "output_summary": {
+        "keys": [
+          "answer",
+          "request",
+          "scratch"
+        ],
+        "size": 3,
+        "type": "mapping"
+      },
+      "request_id": "request-1",
+      "run_kind": "chain",
+      "run_name": null,
+      "session_id": "example-session"
+    }
+  ],
+  "raw": {
+    "answer": {
+      "text": "Local export prepared for: Show a local exporter"
+    },
+    "spans": [
+      {
+        "input": {
+          "request": {
+            "raw_notes": "raw exporter setup notes",
+            "text": "Show a local exporter"
+          },
+          "scratch": {
+            "preview": "console exporter dry run"
+          }
+        },
+        "kind": "CHAIN",
+        "name": "raw_backend_export",
+        "output": {
+          "answer": {
+            "text": "Local export prepared for: Show a local exporter"
+          },
+          "request": {
+            "raw_notes": "raw exporter setup notes",
+            "text": "Show a local exporter"
+          },
+          "scratch": {
+            "preview": "console exporter dry run"
+          }
+        },
+        "status": "UNSET"
+      }
+    ]
+  },
+  "validation": {
+    "error": {
+      "contract": "bad_export_node",
+      "message": "Contract 'bad_export_node' wrote undeclared state paths: transport.target",
+      "paths": [
+        "transport.target"
+      ],
+      "type": "StateContractError"
+    },
+    "spans": [
+      {
+        "attributes": {
+          "error.type": "StateContractError",
+          "graph.node": "bad_export_node"
+        },
+        "input": {
+          "keys": [
+            "request"
+          ],
+          "size": 1,
+          "type": "mapping"
+        },
+        "kind": "CHAIN",
+        "name": "bad_export_node",
+        "status": "ERROR"
+      }
+    ]
+  }
+}
