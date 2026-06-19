@@ -7,7 +7,7 @@ from importlib.resources import files
 def test_distribution_metadata() -> None:
     package_metadata = metadata("graphobs")
 
-    assert version("graphobs") == "0.2.0"
+    assert version("graphobs") == "0.2.1"
     assert package_metadata["Name"] == "graphobs"
     assert package_metadata["License-Expression"] == "Apache-2.0"
 

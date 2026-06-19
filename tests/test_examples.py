@@ -36,11 +36,6 @@ EXPECTED_ERROR_PATHS = {
 
 
 @pytest.mark.parametrize("example", EXAMPLES)
-def test_example_output_matches_static_snippet(example: str) -> None:
-    assert _run_example(example) == _load_snippet(example)
-
-
-@pytest.mark.parametrize("example", EXAMPLES)
 def test_contract_spans_are_clean_and_compact(example: str) -> None:
     payload = _run_example(example)
     contract_spans = _spans(payload, "contract_wrapped")
@@ -103,11 +98,6 @@ def _run_example(example: str) -> dict[str, object]:
         text=True,
     )
     return cast(dict[str, object], json.loads(result.stdout))
-
-
-def _load_snippet(example: str) -> dict[str, object]:
-    path = ROOT / "examples" / example / "trace_snippet.json"
-    return cast(dict[str, object], json.loads(path.read_text(encoding="utf-8")))
 
 
 def _spans(payload: dict[str, object], section: str) -> list[dict[str, object]]:

@@ -57,6 +57,7 @@ dev = [
   "mypy>=1.14",
   "nbmake>=1.5",
   "opentelemetry-sdk>=1.42.1",
+  "pre-commit>=4.6.0",
   "pytest>=8.3",
   "ruff>=0.8",
 ]

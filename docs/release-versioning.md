@@ -4,7 +4,7 @@ graphobs uses Semantic Versioning for public releases.
 
 ## Current Version
 
-`0.2.0` is the current public-ready release.
+`0.2.1` is the current public-ready release.
 
 ## Planned Release Flow
 

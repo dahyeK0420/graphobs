@@ -30,12 +30,10 @@ uv run python -m examples.backend_export.app
 | `examples/tool_agent` | Toy tool-calling flow with compact `TOOL` spans |
 | `examples/backend_export` | Local in-memory and console span exporter setup |
 
-## Snippet Files
+## Validation
 
-Each example includes a `trace_snippet.json` file. These files are generated from
-the same code path as the runnable example and are tested to stay in sync.
-
-Use them when reviewing trace shape without running a backend:
+The example tests run the same code paths as the commands above and assert the
+important trace-shape guarantees:
 
 ```bash
 uv run pytest tests/test_examples.py

@@ -6,8 +6,11 @@ Thanks for considering a contribution to graphobs.
 
 ```bash
 uv sync --all-groups
+make hooks
 uv run pytest
 ```
+
+The pre-commit hook runs `make lint` and `make test` before each commit.
 
 ## Quality Gates
 

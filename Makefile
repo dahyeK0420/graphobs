@@ -7,7 +7,7 @@ UV ?= uv
 
 .DEFAULT_GOAL := help
 
-.PHONY: help install sync version \
+.PHONY: help install sync hooks pre-commit version \
         lint format format-check typecheck test test-examples \
         docs docs-serve build check examples \
         example-simple-rag example-subgraph example-tool-agent example-backend \
@@ -23,6 +23,12 @@ install: ## Install all dependency groups into the virtualenv.
 	$(UV) sync --all-groups
 
 sync: install ## Alias for `install`.
+
+hooks: ## Install pre-commit hooks.
+	$(UV) run pre-commit install
+
+pre-commit: ## Run pre-commit hooks against all files.
+	$(UV) run pre-commit run --all-files
 
 version: ## Print the installed package version.
 	$(UV) run python -c "import graphobs; print(graphobs.__version__)"

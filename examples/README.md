@@ -16,4 +16,5 @@ uv run python -m examples.tool_agent.app
 uv run python -m examples.backend_export.app
 ```
 
-Static snippets are checked in beside each example as `trace_snippet.json`.
+Example tests assert the important trace-shape guarantees without requiring
+checked-in fixture files.

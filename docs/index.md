@@ -8,7 +8,7 @@ The project helps users align three related surfaces:
 - Trace payloads that show curated inputs, outputs, attributes, and errors.
 - Structured logs that record lifecycle events and correlation fields.
 
-The `0.2.0` package contains the public repository foundation, the core typed
+The `0.2.1` package contains the public repository foundation, the core typed
 contract model, LangGraph integration helpers, callback payload projection,
 backend-portable tracing helpers, structured logging helpers, and neutral
 runnable examples.
@@ -114,7 +114,7 @@ uv run python -m examples.tool_agent.app
 uv run python -m examples.backend_export.app
 ```
 
-See [Examples](examples.md) for the full index and snippet workflow.
+See [Examples](examples.md) for the full index and validation workflow.
 
 ## Deeper Docs
 

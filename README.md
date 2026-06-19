@@ -4,7 +4,7 @@
 
 graphobs helps teams describe graph state boundaries once, then reuse those declarations for trace payloads, structured logs, and validation.
 
-The `0.2.0` release is intentionally small. It includes the core contract model,
+The `0.2.1` release is intentionally small. It includes the core contract model,
 LangGraph integration helpers, callback payload projection, backend-portable
 tracing helpers, and structured logging helpers.
 
@@ -99,8 +99,7 @@ uv run python -m examples.backend_export.app
 ```
 
 Each example prints deterministic JSON with raw spans, compact contract spans,
-an intentional contract validation error, and lifecycle log summaries. Static
-snippet files live beside the example code as `trace_snippet.json`.
+an intentional contract validation error, and lifecycle log summaries.
 
 ## Current Package Surface
 
@@ -239,7 +238,7 @@ See [docs/concepts/public-neutrality.md](https://github.com/dahyeK0420/graphobs/
 - [Backend Portability With OTel And OpenInference](https://github.com/dahyeK0420/graphobs/blob/main/docs/concepts/backend-portability.md)
 - [Migrate One Node At A Time](https://github.com/dahyeK0420/graphobs/blob/main/docs/guides/migration-one-node-at-a-time.md)
 - [Medium Companion](https://github.com/dahyeK0420/graphobs/blob/main/docs/articles/medium-companion.md)
-- [0.2.0 Release Notes](https://github.com/dahyeK0420/graphobs/blob/main/docs/releases/v0.2.0.md)
+- [0.2.1 Release Notes](https://github.com/dahyeK0420/graphobs/blob/main/docs/releases/v0.2.1.md)
 - [Contracts API Reference](https://github.com/dahyeK0420/graphobs/blob/main/docs/reference/contracts.md)
 - [LangGraph API Reference](https://github.com/dahyeK0420/graphobs/blob/main/docs/reference/langgraph.md)
 - [Logging API Reference](https://github.com/dahyeK0420/graphobs/blob/main/docs/reference/logging.md)

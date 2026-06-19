@@ -109,7 +109,7 @@ def lifecycle_log_records(
 
 
 def print_json(payload: Mapping[str, object]) -> None:
-    """Prints stable JSON for example commands and snippet files."""
+    """Print stable JSON for example commands."""
     print(json.dumps(payload, indent=2, sort_keys=True))
 
 

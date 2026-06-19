@@ -6,6 +6,14 @@ This project follows Semantic Versioning once public releases begin.
 
 ## Unreleased
 
+## 0.2.1 - 2026-06-19
+
+- Add pre-commit hooks that run `make lint` and `make test` before each commit,
+  installed with `make hooks` and run across all files with `make pre-commit`.
+- Remove the checked-in `trace_snippet.json` example fixtures; the example tests
+  now assert trace-shape guarantees directly, so docs and examples no longer
+  depend on static snapshot files.
+
 ## 0.2.0 - 2026-06-18
 
 - Breaking: narrow package-root exports to the headline interface and keep
