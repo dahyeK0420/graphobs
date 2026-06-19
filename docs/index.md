@@ -1,6 +1,6 @@
-# Graph Observability Kit
+# graphobs
 
-Graph Observability Kit is a Python package for contract-first observability in graph-based applications.
+graphobs is a Python package for contract-first observability in graph-based applications.
 
 The project helps users align three related surfaces:
 
@@ -17,14 +17,14 @@ runnable examples.
 
 ```bash
 uv sync --all-groups
-uv run python -c "import graph_observability_kit; print(graph_observability_kit.__version__)"
+uv run python -c "import graphobs; print(graphobs.__version__)"
 ```
 
 ## Minimal Contract
 
 ```python
-from graph_observability_kit import NodeContract
-from graph_observability_kit.contracts.projection import project_input
+from graphobs import NodeContract
+from graphobs.contracts.projection import project_input
 
 contract = NodeContract(
     name="classify",
@@ -39,8 +39,8 @@ public_input = project_input(contract, state)
 ## Minimal Span
 
 ```python
-from graph_observability_kit.logging.context import LogContext
-from graph_observability_kit.tracing import start_graph_span
+from graphobs.logging.context import LogContext
+from graphobs.tracing import start_graph_span
 
 log_context = LogContext(session_id="session-1", request_id="request-1")
 
@@ -64,7 +64,7 @@ cleaner traces and callback payloads. Use `contract_node` when you are ready for
 execution-time contract guardrails.
 
 ```python
-from graph_observability_kit import NodeContract, contract_node
+from graphobs import NodeContract, contract_node
 
 @contract_node(
     NodeContract(
@@ -83,8 +83,8 @@ For the full adoption path, see
 ## Minimal Structured Logs
 
 ```python
-from graph_observability_kit import build_invoke_config
-from graph_observability_kit.logging.context import LogContext
+from graphobs import build_invoke_config
+from graphobs.logging.context import LogContext
 
 config = build_invoke_config(LogContext(session_id="session-1"))
 graph.compile().invoke({"request": {"text": "hello"}}, config=config)

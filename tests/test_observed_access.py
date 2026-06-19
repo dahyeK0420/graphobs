@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from graph_observability_kit.state.observed_access import (
+from graphobs.state.observed_access import (
     ObservedStatePaths,
     paths_overlap,
     policy_allows_observed_read_path,

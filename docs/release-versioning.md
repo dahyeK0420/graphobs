@@ -1,6 +1,6 @@
 # Release And Versioning Notes
 
-Graph Observability Kit uses Semantic Versioning for public releases.
+graphobs uses Semantic Versioning for public releases.
 
 ## Current Version
 

@@ -14,12 +14,12 @@ from examples._support import (
     print_json,
     span_records,
 )
-from graph_observability_kit import (
+from graphobs import (
     NodeContract,
     add_contract_node,
     contract_node,
 )
-from graph_observability_kit.tracing import (
+from graphobs.tracing import (
     TracePayloadMode,
     set_span_output,
     start_graph_span,

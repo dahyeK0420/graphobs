@@ -1,6 +1,8 @@
-# Graph Observability Kit
+# graphobs
 
-Graph Observability Kit is a Python library for contract-first observability in graph-based applications. It helps teams describe graph state boundaries once, then reuse those declarations for trace payloads, structured logs, and validation.
+**Contract-first observability for graph-based Python apps.**
+
+graphobs helps teams describe graph state boundaries once, then reuse those declarations for trace payloads, structured logs, and validation.
 
 The `0.2.0` release is intentionally small. It includes the core contract model,
 LangGraph integration helpers, callback payload projection, backend-portable
@@ -17,7 +19,7 @@ This project starts from one design rule: state contracts, trace contracts, and 
 Use auto-instrumentation first when you only need a zero-code execution trace.
 It is the lowest-friction baseline.
 
-Graph Observability Kit is for the next problem: deciding what each graph
+graphobs is for the next problem: deciding what each graph
 boundary is allowed to expose, then using that same contract to validate writes
 and curate OpenTelemetry/OpenInference payloads. Auto-instrumentors can show
 what happened, but they cannot infer which state keys are public, which are local
@@ -32,13 +34,13 @@ payload projection or one contract and migrate outward.
 
 [`agent-contracts`](https://github.com/yatarousan0227/agent-contracts) explores
 declarative contracts for LangGraph agents, including graph construction and
-runtime contract enforcement. Graph Observability Kit is narrower: keep your
+runtime contract enforcement. graphobs is narrower: keep your
 existing LangGraph shape, then use contracts to drive curated trace payloads,
 span attributes, structured logs, and write validation.
 
 [LangChain PII middleware](https://docs.langchain.com/oss/python/langchain/middleware/built-in)
 is useful when you need to detect, redact, mask, or block PII in agent messages
-and tool outputs. Graph Observability Kit is not a PII detector. It reduces
+and tool outputs. graphobs is not a PII detector. It reduces
 overcollection by projecting only contract-declared graph state into telemetry
 and by using compact payload summaries by default.
 
@@ -56,7 +58,7 @@ and by using compact payload summaries by default.
 Install the demo bundle and open the notebook:
 
 ```bash
-pip install "graph-observability-kit[demo]"
+pip install "graphobs[demo]"
 jupyter lab examples/notebooks/quickstart.ipynb
 ```
 
@@ -70,7 +72,7 @@ Install the project in editable mode from a checkout:
 
 ```bash
 uv sync --all-groups
-uv run python -c "import graph_observability_kit; print(graph_observability_kit.__version__)"
+uv run python -c "import graphobs; print(graphobs.__version__)"
 ```
 
 Run the local checks:
@@ -106,8 +108,8 @@ The package root exposes the headline adoption path. Lower-level projection,
 logging, and tracing primitives remain available from focused submodules.
 
 ```python
-from graph_observability_kit import NodeContract
-from graph_observability_kit.contracts.projection import project_input
+from graphobs import NodeContract
+from graphobs.contracts.projection import project_input
 
 contract = NodeContract(
     name="classify",
@@ -135,7 +137,7 @@ Callback projection is the lowest-risk migration path because the node still
 receives the graph state LangGraph would normally provide:
 
 ```python
-from graph_observability_kit.langgraph.callbacks import project_callback_payloads
+from graphobs.langgraph.callbacks import project_callback_payloads
 
 config = {
     "callbacks": [
@@ -148,7 +150,7 @@ The strict LangGraph wrapper projects the node's execution input before the
 node runs:
 
 ```python
-from graph_observability_kit import NodeContract, contract_node
+from graphobs import NodeContract, contract_node
 
 @contract_node(
     NodeContract(
@@ -165,8 +167,8 @@ For migration guardrails without execution filtering, wrap at registration time
 with pass-through execution and read auditing:
 
 ```python
-from graph_observability_kit import NodeContract, contract_node
-from graph_observability_kit.contracts.models import ContractViolationAction
+from graphobs import NodeContract, contract_node
+from graphobs.contracts.models import ContractViolationAction
 
 classify_contract = NodeContract(
     name="classify",
@@ -191,7 +193,7 @@ Exporter configuration stays outside the library, so applications can choose any
 OpenTelemetry-compatible backend.
 
 ```python
-from graph_observability_kit.tracing import start_graph_span
+from graphobs.tracing import start_graph_span
 
 with start_graph_span(
     "classify",
@@ -210,8 +212,8 @@ Structured logging helpers emit lifecycle events with correlation fields and
 durations. They do not configure a logging backend or store full graph state.
 
 ```python
-from graph_observability_kit import build_invoke_config
-from graph_observability_kit.logging.context import LogContext
+from graphobs import build_invoke_config
+from graphobs.logging.context import LogContext
 
 config = build_invoke_config(
     LogContext(session_id="session-1", request_id="request-1"),
@@ -223,26 +225,26 @@ graph.compile().invoke({"request": {"text": "hello"}}, config=config)
 
 All docs, tests, examples, fixtures, comments, and exported APIs must use synthetic, generic concepts. Do not include organization-specific, product-specific, deployment-specific, or private runtime details.
 
-See [docs/concepts/public-neutrality.md](docs/concepts/public-neutrality.md) for the repository policy.
+See [docs/concepts/public-neutrality.md](https://github.com/dahyeK0420/graphobs/blob/main/docs/concepts/public-neutrality.md) for the repository policy.
 
 ## Documentation
 
-- [Quickstart Notebook](examples/notebooks/quickstart.ipynb)
-- [Architecture](docs/architecture.md)
-- [Examples](docs/examples.md)
-- [State, Logs, And Traces](docs/concepts/state-logs-traces.md)
-- [Public Vs Private Graph State](docs/concepts/public-vs-private-state.md)
-- [Designing Node Contracts](docs/concepts/designing-node-contracts.md)
-- [Payload Safety And Redaction](docs/concepts/payload-safety-redaction.md)
-- [Backend Portability With OTel And OpenInference](docs/concepts/backend-portability.md)
-- [Migrate One Node At A Time](docs/guides/migration-one-node-at-a-time.md)
-- [Medium Companion](docs/articles/medium-companion.md)
-- [0.2.0 Release Notes](docs/releases/v0.2.0.md)
-- [Contracts API Reference](docs/reference/contracts.md)
-- [LangGraph API Reference](docs/reference/langgraph.md)
-- [Logging API Reference](docs/reference/logging.md)
-- [Tracing API Reference](docs/reference/tracing.md)
-- [Release And Versioning Notes](docs/release-versioning.md)
+- [Quickstart Notebook](https://github.com/dahyeK0420/graphobs/blob/main/examples/notebooks/quickstart.ipynb)
+- [Architecture](https://github.com/dahyeK0420/graphobs/blob/main/docs/architecture.md)
+- [Examples](https://github.com/dahyeK0420/graphobs/blob/main/docs/examples.md)
+- [State, Logs, And Traces](https://github.com/dahyeK0420/graphobs/blob/main/docs/concepts/state-logs-traces.md)
+- [Public Vs Private Graph State](https://github.com/dahyeK0420/graphobs/blob/main/docs/concepts/public-vs-private-state.md)
+- [Designing Node Contracts](https://github.com/dahyeK0420/graphobs/blob/main/docs/concepts/designing-node-contracts.md)
+- [Payload Safety And Redaction](https://github.com/dahyeK0420/graphobs/blob/main/docs/concepts/payload-safety-redaction.md)
+- [Backend Portability With OTel And OpenInference](https://github.com/dahyeK0420/graphobs/blob/main/docs/concepts/backend-portability.md)
+- [Migrate One Node At A Time](https://github.com/dahyeK0420/graphobs/blob/main/docs/guides/migration-one-node-at-a-time.md)
+- [Medium Companion](https://github.com/dahyeK0420/graphobs/blob/main/docs/articles/medium-companion.md)
+- [0.2.0 Release Notes](https://github.com/dahyeK0420/graphobs/blob/main/docs/releases/v0.2.0.md)
+- [Contracts API Reference](https://github.com/dahyeK0420/graphobs/blob/main/docs/reference/contracts.md)
+- [LangGraph API Reference](https://github.com/dahyeK0420/graphobs/blob/main/docs/reference/langgraph.md)
+- [Logging API Reference](https://github.com/dahyeK0420/graphobs/blob/main/docs/reference/logging.md)
+- [Tracing API Reference](https://github.com/dahyeK0420/graphobs/blob/main/docs/reference/tracing.md)
+- [Release And Versioning Notes](https://github.com/dahyeK0420/graphobs/blob/main/docs/release-versioning.md)
 
 The MkDocs site can be built locally with:
 

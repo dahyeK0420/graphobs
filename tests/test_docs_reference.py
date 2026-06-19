@@ -6,37 +6,37 @@ from pathlib import Path
 REFERENCE_DIR = Path(__file__).resolve().parents[1] / "docs" / "reference"
 
 EXPECTED_REFERENCE_TARGETS = {
-    "callbacks.md": ("graph_observability_kit.langgraph.callbacks",),
+    "callbacks.md": ("graphobs.langgraph.callbacks",),
     "contracts.md": (
-        "graph_observability_kit.contracts.models",
-        "graph_observability_kit.contracts.projection",
-        "graph_observability_kit.contracts.validation",
-        "graph_observability_kit.state.paths",
+        "graphobs.contracts.models",
+        "graphobs.contracts.projection",
+        "graphobs.contracts.validation",
+        "graphobs.state.paths",
     ),
     "demo.md": (
-        "graph_observability_kit.demo.tracing_setup",
-        "graph_observability_kit.demo.span_records",
+        "graphobs.demo.tracing_setup",
+        "graphobs.demo.span_records",
     ),
     "discovery.md": (
-        "graph_observability_kit.discovery.draft",
-        "graph_observability_kit.discovery.runner",
+        "graphobs.discovery.draft",
+        "graphobs.discovery.runner",
     ),
     "langgraph.md": (
-        "graph_observability_kit.langgraph.nodes",
-        "graph_observability_kit.langgraph.subgraphs",
-        "graph_observability_kit.langgraph.schemas",
+        "graphobs.langgraph.nodes",
+        "graphobs.langgraph.subgraphs",
+        "graphobs.langgraph.schemas",
     ),
     "logging.md": (
-        "graph_observability_kit.logging.context",
-        "graph_observability_kit.logging.callback",
-        "graph_observability_kit.logging.invoke_config",
+        "graphobs.logging.context",
+        "graphobs.logging.callback",
+        "graphobs.logging.invoke_config",
     ),
-    "package.md": ("graph_observability_kit",),
-    "payloads.md": ("graph_observability_kit.payloads",),
-    "tracing.md": ("graph_observability_kit.tracing",),
+    "package.md": ("graphobs",),
+    "payloads.md": ("graphobs.payloads",),
+    "tracing.md": ("graphobs.tracing",),
 }
 
-REFERENCE_DIRECTIVE_RE = re.compile(r"^:::\s+(graph_observability_kit\S*)", re.M)
+REFERENCE_DIRECTIVE_RE = re.compile(r"^:::\s+(graphobs\S*)", re.M)
 
 
 def test_reference_pages_target_public_implementation_modules() -> None:
@@ -57,7 +57,7 @@ def test_reference_pages_do_not_target_private_modules() -> None:
             targets := tuple(
                 target
                 for target in REFERENCE_DIRECTIVE_RE.findall(path.read_text())
-                if target.startswith("graph_observability_kit._")
+                if target.startswith("graphobs._")
             )
         )
     }

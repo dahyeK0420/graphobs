@@ -3,12 +3,13 @@ requires = ["hatchling>=1.26"]
 build-backend = "hatchling.build"
 
 [project]
-name = "graph-observability-kit"
-version = "0.2.0"
+name = "graphobs"
+dynamic = ["version"]
 description = "Contract-first observability helpers for graph-based Python applications."
 readme = "README.md"
 requires-python = ">=3.11"
 license = "Apache-2.0"
+authors = [{ name = "Dahye Kim", email = "dahye.k94420@gmail.com"  }]
 keywords = [
   "graph",
   "observability",
@@ -19,7 +20,6 @@ keywords = [
 classifiers = [
   "Development Status :: 3 - Alpha",
   "Intended Audience :: Developers",
-  "License :: OSI Approved :: Apache Software License",
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
@@ -32,6 +32,12 @@ dependencies = [
     "openinference-semantic-conventions>=0.1.30",
     "opentelemetry-api>=1.42.1",
 ]
+
+[project.urls]
+Homepage = "https://github.com/dahyeK0420/graphobs"
+Repository = "https://github.com/dahyeK0420/graphobs"
+Issues = "https://github.com/dahyeK0420/graphobs/issues"
+Changelog = "https://github.com/dahyeK0420/graphobs/blob/main/CHANGELOG.md"
 
 [project.optional-dependencies]
 demo = [
@@ -55,8 +61,11 @@ dev = [
   "ruff>=0.8",
 ]
 
+[tool.hatch.version]
+path = "src/graphobs/_version.py"
+
 [tool.hatch.build.targets.wheel]
-packages = ["src/graph_observability_kit"]
+packages = ["src/graphobs"]
 
 [tool.ruff]
 line-length = 88
@@ -69,7 +78,7 @@ select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
 [tool.mypy]
 python_version = "3.11"
 strict = true
-packages = ["graph_observability_kit"]
+packages = ["graphobs"]
 
 [tool.pytest.ini_options]
 addopts = "-q"

@@ -10,4 +10,4 @@ that is safe to store in traces.
 `TracePayloadMode`, `PayloadSerializer`, and `default_payload_serializer` are
 public tracing APIs for selecting and customizing payload serialization.
 
-::: graph_observability_kit.tracing
+::: graphobs.tracing

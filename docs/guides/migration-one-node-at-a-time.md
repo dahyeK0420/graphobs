@@ -1,6 +1,6 @@
 # Migrate One Node At A Time
 
-You can adopt Graph Observability Kit without rewriting a graph. Start with one
+You can adopt graphobs without rewriting a graph. Start with one
 node, prove the boundary, then repeat.
 
 If your graph has fewer than three nodes or no noisy shared state, plain
@@ -16,7 +16,7 @@ answering step is usually easier than a node that mutates many unrelated keys.
 ## 2. Declare The Contract
 
 ```python
-from graph_observability_kit import NodeContract
+from graphobs import NodeContract
 
 classify_contract = NodeContract(
     name="classify",
@@ -46,7 +46,7 @@ Use callback projection when the node should continue receiving the same state
 as before, but downstream callbacks should see contract-projected payloads:
 
 ```python
-from graph_observability_kit.langgraph.callbacks import project_callback_payloads
+from graphobs.langgraph.callbacks import project_callback_payloads
 
 config = {
     "callbacks": [
@@ -69,8 +69,8 @@ Use pass-through mode when an existing node may read fallback keys or
 namespace-managed state that is not fully declared yet:
 
 ```python
-from graph_observability_kit import contract_node
-from graph_observability_kit.contracts.models import ContractViolationAction
+from graphobs import contract_node
+from graphobs.contracts.models import ContractViolationAction
 
 graph.add_node(
     "classify",
@@ -95,7 +95,7 @@ Use strict mode once the boundary is stable or when you want the contract to
 shape what the node receives:
 
 ```python
-from graph_observability_kit import contract_node
+from graphobs import contract_node
 
 
 @contract_node(classify_contract)
@@ -110,7 +110,7 @@ If you prefer to leave the function definition untouched, wrap at registration
 time instead:
 
 ```python
-from graph_observability_kit import contract_node
+from graphobs import contract_node
 
 graph.add_node("classify", contract_node(classify, classify_contract))
 ```
@@ -119,7 +119,7 @@ The convenience helper registers the node with `contract.label`, which is the
 same value supplied as `NodeContract(name=...)`:
 
 ```python
-from graph_observability_kit import add_contract_node
+from graphobs import add_contract_node
 
 add_contract_node(graph, classify_contract, classify)
 ```
@@ -130,7 +130,7 @@ During early adoption, you can log undeclared writes and continue instead of
 raising immediately:
 
 ```python
-from graph_observability_kit.contracts.models import ContractViolationAction
+from graphobs.contracts.models import ContractViolationAction
 
 graph.add_node(
     "classify",
@@ -151,7 +151,7 @@ Run the same graph invocation you already use. If the node returns an undeclared
 path, `StateContractError` points to the boundary mismatch.
 
 ```python
-from graph_observability_kit.contracts.models import StateContractError
+from graphobs.contracts.models import StateContractError
 
 try:
     app.invoke({"request": {"text": "hello"}})
@@ -162,8 +162,8 @@ except StateContractError as exc:
 ## 5. Add Correlation When Useful
 
 ```python
-from graph_observability_kit import build_invoke_config
-from graph_observability_kit.logging.context import LogContext
+from graphobs import build_invoke_config
+from graphobs.logging.context import LogContext
 
 config = build_invoke_config(
     LogContext(session_id="session-1", request_id="request-1"),

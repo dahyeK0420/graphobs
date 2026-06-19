@@ -4,12 +4,12 @@ import logging
 
 import pytest
 
-from graph_observability_kit.contracts.models import NodeContract
-from graph_observability_kit.langgraph.read_audit import (
+from graphobs.contracts.models import NodeContract
+from graphobs.langgraph.read_audit import (
     undeclared_read_paths,
     warn_undeclared_reads,
 )
-from graph_observability_kit.state.read_tracking import ReadTracker
+from graphobs.state.read_tracking import ReadTracker
 
 
 def test_undeclared_read_paths_uses_shared_observed_access_classification() -> None:
@@ -37,7 +37,7 @@ def test_undeclared_read_paths_uses_shared_observed_access_classification() -> N
 def test_warn_undeclared_reads_preserves_warning_text_and_order(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    caplog.set_level(logging.WARNING, logger="graph_observability_kit.langgraph")
+    caplog.set_level(logging.WARNING, logger="graphobs.langgraph")
     contract = NodeContract(name="audited", reads=("request.text",), writes=())
     tracker = ReadTracker()
     tracker.record(("context", "extra"))

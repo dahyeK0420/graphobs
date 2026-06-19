@@ -1,4 +1,4 @@
-# Graph Observability Kit — developer task runner.
+# graphobs — developer task runner.
 #
 # Thin wrappers around the `uv` commands documented in README.md, CONTRIBUTING.md,
 # and docs/. Run `make` or `make help` to list available targets.
@@ -25,7 +25,7 @@ install: ## Install all dependency groups into the virtualenv.
 sync: install ## Alias for `install`.
 
 version: ## Print the installed package version.
-	$(UV) run python -c "import graph_observability_kit; print(graph_observability_kit.__version__)"
+	$(UV) run python -c "import graphobs; print(graphobs.__version__)"
 
 ## --- Quality gates -------------------------------------------------------
 

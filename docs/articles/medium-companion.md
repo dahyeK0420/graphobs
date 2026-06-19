@@ -17,7 +17,7 @@ The article explains the design problem. These docs show the adoption path.
 ## Minimal Wrapper
 
 ```python
-from graph_observability_kit import NodeContract, contract_node
+from graphobs import NodeContract, contract_node
 
 @contract_node(
     NodeContract(

@@ -5,7 +5,7 @@ from typing import TypedDict
 
 from langgraph.graph import END, START, StateGraph
 
-from graph_observability_kit import NodeContract, add_contract_node
+from graphobs import NodeContract, add_contract_node
 
 MappingState = Mapping[str, object]
 

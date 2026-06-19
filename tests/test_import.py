@@ -6,36 +6,36 @@ from types import ModuleType
 
 import pytest
 
-import graph_observability_kit
-import graph_observability_kit.contracts.models as models
-import graph_observability_kit.contracts.projection as projection
-import graph_observability_kit.contracts.validation as validation
-import graph_observability_kit.demo.span_records as span_records
-import graph_observability_kit.demo.tracing_setup as tracing_setup
-import graph_observability_kit.discovery.draft as draft
-import graph_observability_kit.discovery.runner as runner
-import graph_observability_kit.langgraph.callbacks as callbacks
-import graph_observability_kit.langgraph.nodes as nodes
-import graph_observability_kit.langgraph.schemas as schemas
-import graph_observability_kit.langgraph.subgraphs as subgraphs
-import graph_observability_kit.logging.callback as callback
-import graph_observability_kit.logging.context as context
-import graph_observability_kit.logging.invoke_config as invoke_config
-import graph_observability_kit.state.paths as paths
-from graph_observability_kit import payloads, tracing
+import graphobs
+import graphobs.contracts.models as models
+import graphobs.contracts.projection as projection
+import graphobs.contracts.validation as validation
+import graphobs.demo.span_records as span_records
+import graphobs.demo.tracing_setup as tracing_setup
+import graphobs.discovery.draft as draft
+import graphobs.discovery.runner as runner
+import graphobs.langgraph.callbacks as callbacks
+import graphobs.langgraph.nodes as nodes
+import graphobs.langgraph.schemas as schemas
+import graphobs.langgraph.subgraphs as subgraphs
+import graphobs.logging.callback as callback
+import graphobs.logging.context as context
+import graphobs.logging.invoke_config as invoke_config
+import graphobs.state.paths as paths
+from graphobs import payloads, tracing
 
 
 def test_package_imports() -> None:
-    assert graph_observability_kit.__version__ == "0.2.0"
+    assert graphobs.__version__ == "0.2.0"
 
 
 @pytest.mark.parametrize(
     "module_name",
     [
-        "graph_observability_kit._instrumented_execution",
-        "graph_observability_kit._read_tracking",
-        "graph_observability_kit._state_paths",
-        "graph_observability_kit.callbacks",
+        "graphobs._instrumented_execution",
+        "graphobs._read_tracking",
+        "graphobs._state_paths",
+        "graphobs.callbacks",
     ],
 )
 def test_obsolete_shim_modules_are_removed(module_name: str) -> None:
@@ -43,14 +43,14 @@ def test_obsolete_shim_modules_are_removed(module_name: str) -> None:
 
 
 def test_package_root_exports_headline_interface_only() -> None:
-    from graph_observability_kit import (
+    from graphobs import (
         NodeContract,
         add_contract_node,
         build_invoke_config,
         contract_node,
     )
 
-    assert graph_observability_kit.__all__ == [
+    assert graphobs.__all__ == [
         "NodeContract",
         "__version__",
         "add_contract_node",
@@ -67,7 +67,7 @@ def test_package_root_exports_headline_interface_only() -> None:
     ("module", "expected_exports"),
     [
         (
-            graph_observability_kit,
+            graphobs,
             [
                 "NodeContract",
                 "__version__",
@@ -200,41 +200,41 @@ def test_public_module_exports_are_stable(
 
 
 def test_concrete_public_modules_expose_expected_objects() -> None:
-    from graph_observability_kit.contracts.models import (
+    from graphobs.contracts.models import (
         Contract,
         ContractViolationAction,
         ProjectionPolicy,
         StateContractError,
         SubgraphContract,
     )
-    from graph_observability_kit.contracts.projection import (
+    from graphobs.contracts.projection import (
         project_input,
         project_node_payload,
         project_output,
     )
-    from graph_observability_kit.contracts.validation import validate_update
-    from graph_observability_kit.discovery.draft import DiscoveredContract
-    from graph_observability_kit.discovery.runner import (
+    from graphobs.contracts.validation import validate_update
+    from graphobs.discovery.draft import DiscoveredContract
+    from graphobs.discovery.runner import (
         ContractDiscoveryError,
         adiscover_contract,
         discover_contract,
     )
-    from graph_observability_kit.langgraph.callbacks import (
+    from graphobs.langgraph.callbacks import (
         ProjectedCallbackHandler,
         ProjectionStats,
         project_callback_payloads,
     )
-    from graph_observability_kit.langgraph.nodes import NodeBuilder
-    from graph_observability_kit.langgraph.schemas import langgraph_input_schema
-    from graph_observability_kit.langgraph.subgraphs import (
+    from graphobs.langgraph.nodes import NodeBuilder
+    from graphobs.langgraph.schemas import langgraph_input_schema
+    from graphobs.langgraph.subgraphs import (
         InvokableGraph,
         contract_subgraph,
     )
-    from graph_observability_kit.logging.callback import GraphLogCallback
-    from graph_observability_kit.logging.context import CorrelationFields, LogContext
-    from graph_observability_kit.payloads import shape_summary
-    from graph_observability_kit.state.paths import state_diff
-    from graph_observability_kit.tracing import (
+    from graphobs.logging.callback import GraphLogCallback
+    from graphobs.logging.context import CorrelationFields, LogContext
+    from graphobs.payloads import shape_summary
+    from graphobs.state.paths import state_diff
+    from graphobs.tracing import (
         PayloadSerializer,
         TracePayloadMode,
         default_payload_serializer,
@@ -304,4 +304,4 @@ def test_removed_names_are_not_available_from_package_root() -> None:
         "state_diff",
     )
 
-    assert all(not hasattr(graph_observability_kit, name) for name in removed_names)
+    assert all(not hasattr(graphobs, name) for name in removed_names)

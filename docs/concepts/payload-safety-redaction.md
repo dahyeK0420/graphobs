@@ -3,15 +3,15 @@
 Trace payloads are useful because they show what a graph step saw and produced.
 They are risky when they record more state than intended.
 
-Graph Observability Kit defaults to compact payloads. Compact payloads describe
+graphobs defaults to compact payloads. Compact payloads describe
 shape, not full values.
 
 Contracts, structured logs, and traces use the public
-`graph_observability_kit.payloads.shape_summary` helper so compact payloads do
+`graphobs.payloads.shape_summary` helper so compact payloads do
 not drift across observability surfaces.
 
 ```python
-from graph_observability_kit.payloads import shape_summary
+from graphobs.payloads import shape_summary
 
 summary = shape_summary({"request": {"text": "hello"}})
 ```
@@ -19,11 +19,11 @@ summary = shape_summary({"request": {"text": "hello"}})
 ## Compact Mode
 
 `TracePayloadMode`, `PayloadSerializer`, and `default_payload_serializer` are
-public APIs from `graph_observability_kit.tracing`. `TracePayloadMode.COMPACT`
+public APIs from `graphobs.tracing`. `TracePayloadMode.COMPACT`
 records summaries such as mapping size, keys, string length, and sequence size.
 
 ```python
-from graph_observability_kit.tracing import start_graph_span
+from graphobs.tracing import start_graph_span
 
 with start_graph_span("classify", "CHAIN", input={"request": {"text": "hello"}}):
     ...
@@ -38,7 +38,7 @@ state value.
 controlled debugging data that is safe to store in the selected trace backend.
 
 ```python
-from graph_observability_kit.tracing import TracePayloadMode, start_graph_span
+from graphobs.tracing import TracePayloadMode, start_graph_span
 
 with start_graph_span(
     "debug_classify",
@@ -59,7 +59,7 @@ need project-specific rules.
 ```python
 import json
 
-from graph_observability_kit.tracing import (
+from graphobs.tracing import (
     TracePayloadMode,
     default_payload_serializer,
 )
@@ -92,7 +92,7 @@ Wrap callbacks with `project_callback_payloads` when a downstream callback
 should receive contract-projected node inputs and outputs:
 
 ```python
-from graph_observability_kit.langgraph.callbacks import project_callback_payloads
+from graphobs.langgraph.callbacks import project_callback_payloads
 
 config = {
     "callbacks": [

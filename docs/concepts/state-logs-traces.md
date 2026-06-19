@@ -16,7 +16,7 @@ State is the data a graph carries between steps. Contracts define which keys a n
 
 Logs record discrete lifecycle events. They are useful for operational timelines, error summaries, counters, and correlation fields. Logs should avoid duplicating large state payloads.
 
-Graph Observability Kit provides `LogContext`, `CorrelationFields`,
+graphobs provides `LogContext`, `CorrelationFields`,
 `GraphLogCallback`, and `build_invoke_config` for LangGraph/LangChain-style
 callback logging. These helpers emit start, end, and error events with run IDs,
 parent run IDs, durations, correlation fields, and compact input/output shape
@@ -30,7 +30,7 @@ should share correlation fields.
 
 LangGraph node callbacks may receive the graph runtime's outer chain payload
 even when a node is wrapped with a contract. Use
-`graph_observability_kit.langgraph.callbacks.project_callback_payloads` around callbacks
+`graphobs.langgraph.callbacks.project_callback_payloads` around callbacks
 that should see the contract-projected node input and output instead. Root graph
 events and unknown nodes pass through unchanged.
 
@@ -38,7 +38,7 @@ events and unknown nodes pass through unchanged.
 
 Traces show execution flow. A span can capture timing, a span kind, curated input, curated output, searchable attributes, and errors.
 
-Graph Observability Kit emits OpenTelemetry spans and uses OpenInference
+graphobs emits OpenTelemetry spans and uses OpenInference
 semantic attributes where they apply. The library does not configure exporters.
 Applications choose their own OpenTelemetry-compatible backend and configure the
 tracer provider at the application boundary.

@@ -4,7 +4,7 @@ import logging
 
 import pytest
 
-from graph_observability_kit.state.paths import (
+from graphobs.state.paths import (
     delete_path,
     get_path,
     is_prefix,
@@ -16,7 +16,7 @@ from graph_observability_kit.state.paths import (
     split_path,
     state_diff,
 )
-from graph_observability_kit.state.policies import (
+from graphobs.state.policies import (
     policy_allows_read_path,
     policy_allows_write_path,
 )
@@ -46,7 +46,7 @@ def test_normalize_optional_paths_preserves_open_projection() -> None:
 def test_split_path_rejects_blank_parts_with_error_log(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    caplog.set_level(logging.ERROR, logger="graph_observability_kit.state.paths")
+    caplog.set_level(logging.ERROR, logger="graphobs.state.paths")
 
     with pytest.raises(
         ValueError,

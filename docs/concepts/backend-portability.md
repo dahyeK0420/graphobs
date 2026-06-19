@@ -1,6 +1,6 @@
 # Backend Portability With OTel And OpenInference
 
-Graph Observability Kit emits spans through OpenTelemetry and uses
+graphobs emits spans through OpenTelemetry and uses
 OpenInference semantic attributes where they fit graph execution. It does not
 choose, configure, or replace an observability backend.
 

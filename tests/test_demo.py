@@ -6,16 +6,14 @@ from typing import Any, cast
 
 import pytest
 
-from graph_observability_kit.demo.span_records import span_record
-from graph_observability_kit.demo.tracing_setup import (
+from graphobs.demo.span_records import span_record
+from graphobs.demo.tracing_setup import (
     configure_local_tracing,
     configure_otlp_tracing,
     configure_phoenix_tracing,
 )
 
-INSTALL_HINT = (
-    'Install the demo dependencies first: pip install "graph-observability-kit[demo]"'
-)
+INSTALL_HINT = 'Install the demo dependencies first: pip install "graphobs[demo]"'
 
 
 def test_configure_local_tracing_fails_lazily_with_install_hint(
@@ -78,7 +76,7 @@ def _block_imports(
 def _install_hint_regex() -> str:
     return (
         r"Install the demo dependencies first: pip install "
-        r'"graph-observability-kit\[demo\]"'
+        r'"graphobs\[demo\]"'
     )
 
 

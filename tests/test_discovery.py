@@ -6,8 +6,8 @@ from collections.abc import Mapping
 
 import pytest
 
-from graph_observability_kit.discovery.draft import DiscoveredContract
-from graph_observability_kit.discovery.runner import (
+from graphobs.discovery.draft import DiscoveredContract
+from graphobs.discovery.runner import (
     ContractDiscoveryError,
     adiscover_contract,
     discover_contract,
@@ -146,7 +146,7 @@ def test_discovered_contract_private_overrides_move_overlapping_paths() -> None:
 def test_discovery_failure_logs_error_and_preserves_original_exception(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    caplog.set_level(logging.ERROR, logger="graph_observability_kit.discovery")
+    caplog.set_level(logging.ERROR, logger="graphobs.discovery")
 
     def failing_node(state: Mapping[str, object]) -> Mapping[str, object]:
         raise RuntimeError(f"synthetic failure for {state['request']}")

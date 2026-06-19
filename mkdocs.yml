@@ -1,6 +1,6 @@
-site_name: Graph Observability Kit
+site_name: graphobs
 site_description: Contract-first observability helpers for graph-based Python applications.
-repo_name: graph-observability-kit
+repo_name: graphobs
 
 theme:
   name: material

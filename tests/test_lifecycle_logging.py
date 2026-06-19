@@ -5,11 +5,11 @@ from typing import cast
 
 import pytest
 
-from graph_observability_kit.logging.context import (
+from graphobs.logging.context import (
     CorrelationFields,
     LogContext,
 )
-from graph_observability_kit.logging.lifecycle import (
+from graphobs.logging.lifecycle import (
     EVENT_LOGGER_NAME,
     LifecycleLogEmitter,
 )
@@ -116,7 +116,7 @@ def test_lifecycle_emitter_warns_when_duration_is_missing(
 def test_lifecycle_emitter_logs_correlation_conflicts(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    caplog.set_level(logging.ERROR, logger="graph_observability_kit.logging")
+    caplog.set_level(logging.ERROR, logger="graphobs.logging")
     emitter = LifecycleLogEmitter(
         LogContext(session_id="session-1"),
         CorrelationFields(),
@@ -142,8 +142,8 @@ def test_lifecycle_emitter_logs_correlation_conflicts(
 def test_lifecycle_emitter_logger_failure_logs_error_and_raises(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    caplog.set_level(logging.ERROR, logger="graph_observability_kit.logging")
-    logger = logging.getLogger("tests.graph_observability_kit.lifecycle_failing_logs")
+    caplog.set_level(logging.ERROR, logger="graphobs.logging")
+    logger = logging.getLogger("tests.graphobs.lifecycle_failing_logs")
     logger.handlers.clear()
     logger.propagate = False
     logger.setLevel(logging.INFO)

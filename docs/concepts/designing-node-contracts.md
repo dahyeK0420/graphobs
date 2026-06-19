@@ -15,7 +15,7 @@ For an existing node, `discover_contract` can run the node against synthetic
 sample states and produce a draft contract boundary.
 
 ```python
-from graph_observability_kit.discovery.runner import discover_contract
+from graphobs.discovery.runner import discover_contract
 
 
 def classify(state):
@@ -59,8 +59,8 @@ Use `ProjectionPolicy` when the public boundary needs include, exclude, or
 summary rules instead of a plain tuple of dotted paths.
 
 ```python
-from graph_observability_kit import NodeContract
-from graph_observability_kit.contracts.models import ProjectionPolicy
+from graphobs import NodeContract
+from graphobs.contracts.models import ProjectionPolicy
 
 contract = NodeContract(
     name="retrieve",

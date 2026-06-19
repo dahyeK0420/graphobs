@@ -1,6 +1,6 @@
 # Contributing
 
-Thanks for considering a contribution to Graph Observability Kit.
+Thanks for considering a contribution to graphobs.
 
 ## Development Setup
 

@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-import graph_observability_kit
+import graphobs
 
 
 def main() -> None:
     """Prints the installed package version."""
-    print(graph_observability_kit.__version__)
+    print(graphobs.__version__)
 
 
 if __name__ == "__main__":

@@ -7,13 +7,13 @@ from uuid import uuid4
 import pytest
 from langgraph.graph import END, START, StateGraph
 
-from graph_observability_kit.logging.callback import GraphLogCallback
-from graph_observability_kit.logging.context import (
+from graphobs.logging.callback import GraphLogCallback
+from graphobs.logging.context import (
     CorrelationFields,
     LogContext,
 )
-from graph_observability_kit.logging.invoke_config import build_invoke_config
-from graph_observability_kit.tracing import (
+from graphobs.logging.invoke_config import build_invoke_config
+from graphobs.tracing import (
     start_graph_span,
 )
 
@@ -26,7 +26,7 @@ class ExampleState(TypedDict, total=False):
 
 
 def test_chain_lifecycle_log_shape(caplog: pytest.LogCaptureFixture) -> None:
-    caplog.set_level(logging.INFO, logger="graph_observability_kit.logs")
+    caplog.set_level(logging.INFO, logger="graphobs.logs")
     run_id = uuid4()
     context = LogContext(session_id="session-1", trace_id="trace-1")
     callback = GraphLogCallback(context)
@@ -63,7 +63,7 @@ def test_chain_lifecycle_log_shape(caplog: pytest.LogCaptureFixture) -> None:
 def test_langgraph_invoke_config_emits_node_like_events(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    caplog.set_level(logging.INFO, logger="graph_observability_kit.logs")
+    caplog.set_level(logging.INFO, logger="graphobs.logs")
 
     def answer(state: ExampleState) -> ExampleState:
         return {"answer": {"text": f"hello {state['request']['text']}"}}
@@ -100,7 +100,7 @@ def test_langgraph_invoke_config_emits_node_like_events(
 
 
 def test_tool_lifecycle_log_shape(caplog: pytest.LogCaptureFixture) -> None:
-    caplog.set_level(logging.INFO, logger="graph_observability_kit.logs")
+    caplog.set_level(logging.INFO, logger="graphobs.logs")
     run_id = uuid4()
     callback = GraphLogCallback(LogContext(conversation_id="conversation-1"))
 
@@ -128,7 +128,7 @@ def test_tool_lifecycle_log_shape(caplog: pytest.LogCaptureFixture) -> None:
 def test_error_message_is_truncated_by_default(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    caplog.set_level(logging.ERROR, logger="graph_observability_kit.logs")
+    caplog.set_level(logging.ERROR, logger="graphobs.logs")
     run_id = uuid4()
     callback = GraphLogCallback(error_message_max_length=32)
     callback.on_chain_start({"name": "failing"}, {}, run_id=run_id)
@@ -148,7 +148,7 @@ def test_error_message_is_truncated_by_default(
 def test_custom_correlation_fields_propagate_to_metadata_and_logs(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    caplog.set_level(logging.INFO, logger="graph_observability_kit.logs")
+    caplog.set_level(logging.INFO, logger="graphobs.logs")
     fields = CorrelationFields(
         session="session.id",
         conversation="conversation.id",
@@ -186,7 +186,7 @@ def test_custom_correlation_fields_propagate_to_metadata_and_logs(
 
 
 def test_metadata_conflict_raises_and_logs(caplog: pytest.LogCaptureFixture) -> None:
-    caplog.set_level(logging.ERROR, logger="graph_observability_kit.logging")
+    caplog.set_level(logging.ERROR, logger="graphobs.logging")
     expected_error = "metadata correlation field 'session_id' conflicts with LogContext"
 
     with pytest.raises(ValueError, match=expected_error):
@@ -202,7 +202,7 @@ def test_metadata_conflict_raises_and_logs(caplog: pytest.LogCaptureFixture) -> 
 def test_missing_start_time_warns_and_still_emits_end(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    caplog.set_level(logging.INFO, logger="graph_observability_kit.logs")
+    caplog.set_level(logging.INFO, logger="graphobs.logs")
     callback = GraphLogCallback()
     run_id = uuid4()
 
@@ -238,7 +238,7 @@ def test_callback_flags_match_langchain_expectations() -> None:
 
 
 def test_logger_injection_uses_custom_logger() -> None:
-    logger = logging.getLogger("tests.graph_observability_kit.custom_logs")
+    logger = logging.getLogger("tests.graphobs.custom_logs")
     logger.handlers.clear()
     logger.propagate = False
     logger.setLevel(logging.INFO)
@@ -267,8 +267,8 @@ def test_logger_injection_uses_custom_logger() -> None:
 def test_logger_failure_logs_error_and_raises(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    caplog.set_level(logging.ERROR, logger="graph_observability_kit.logging")
-    logger = logging.getLogger("tests.graph_observability_kit.failing_logs")
+    caplog.set_level(logging.ERROR, logger="graphobs.logging")
+    logger = logging.getLogger("tests.graphobs.failing_logs")
     logger.handlers.clear()
     logger.propagate = False
     logger.setLevel(logging.INFO)
@@ -287,7 +287,7 @@ def test_logger_failure_logs_error_and_raises(
 def test_logs_and_spans_share_correlation_without_trace_payloads(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    caplog.set_level(logging.INFO, logger="graph_observability_kit.logs")
+    caplog.set_level(logging.INFO, logger="graphobs.logs")
     context = LogContext(session_id="session-5", trace_id="trace-5")
     run_id = uuid4()
     callback = GraphLogCallback(context)

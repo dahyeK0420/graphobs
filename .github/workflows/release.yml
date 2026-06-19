@@ -1,0 +1,47 @@
+name: Release
+
+# Publishes to PyPI when a GitHub Release is published.
+# Uses PyPI Trusted Publishing (OIDC) — no API tokens or secrets to manage.
+#
+# One-time setup on PyPI before the first run:
+#   PyPI -> project "graphobs" -> Publishing -> add a Trusted Publisher with
+#     Owner:        dahyeK0420
+#     Repository:   graphobs
+#     Workflow:     release.yml
+#     Environment:  pypi
+# For the very first release (project does not exist yet), create a
+# "pending publisher" with the same values at https://pypi.org/manage/account/publishing/
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/graphobs
+    permissions:
+      id-token: write  # required for Trusted Publishing
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1

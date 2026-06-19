@@ -1,1 +1,1 @@
-"""Runnable public examples for Graph Observability Kit."""
+"""Runnable public examples for graphobs."""

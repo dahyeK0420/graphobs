@@ -1022,8 +1022,7 @@ wheels = [
 ]
 
 [[package]]
-name = "graph-observability-kit"
-version = "0.1.0"
+name = "graphobs"
 source = { editable = "." }
 dependencies = [
     { name = "langgraph" },

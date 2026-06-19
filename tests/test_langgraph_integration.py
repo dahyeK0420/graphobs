@@ -17,24 +17,24 @@ from opentelemetry.sdk.trace.export.in_memory_span_exporter import (
     InMemorySpanExporter,
 )
 
-from graph_observability_kit.contracts.models import (
+from graphobs.contracts.models import (
     ContractViolationAction,
     NodeContract,
     ProjectionPolicy,
     StateContractError,
     SubgraphContract,
 )
-from graph_observability_kit.langgraph.execution import (
+from graphobs.langgraph.execution import (
     instrument_contract_run,
     node_contract_run_spec,
     subgraph_contract_run_spec,
 )
-from graph_observability_kit.langgraph.nodes import (
+from graphobs.langgraph.nodes import (
     add_contract_node,
     contract_node,
 )
-from graph_observability_kit.langgraph.schemas import langgraph_input_schema
-from graph_observability_kit.langgraph.subgraphs import (
+from graphobs.langgraph.schemas import langgraph_input_schema
+from graphobs.langgraph.subgraphs import (
     InvokableGraph,
     contract_subgraph,
 )
@@ -195,7 +195,7 @@ def test_contract_node_can_pass_through_state_while_projecting_span(
 def test_contract_node_audit_reads_warns_for_undeclared_paths(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    caplog.set_level(logging.WARNING, logger="graph_observability_kit.langgraph")
+    caplog.set_level(logging.WARNING, logger="graphobs.langgraph")
 
     def classify(state: MappingState) -> MappingState:
         request = state["request"]
@@ -235,7 +235,7 @@ def test_contract_node_audit_reads_warns_for_undeclared_paths(
 def test_contract_node_audit_reads_allows_parent_read_policy(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    caplog.set_level(logging.WARNING, logger="graph_observability_kit.langgraph")
+    caplog.set_level(logging.WARNING, logger="graphobs.langgraph")
 
     def classify(state: MappingState) -> MappingState:
         context = state["context"]
@@ -263,7 +263,7 @@ def test_contract_node_audit_reads_allows_parent_read_policy(
 def test_contract_node_pass_through_and_audit_support_async_nodes(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    caplog.set_level(logging.WARNING, logger="graph_observability_kit.langgraph")
+    caplog.set_level(logging.WARNING, logger="graphobs.langgraph")
 
     async def classify_async(state: MappingState) -> MappingState:
         await asyncio.sleep(0)
@@ -427,7 +427,7 @@ def test_node_contract_run_spec_returns_update_and_projects_span_output(
         attributes={"graph.node": contract.label},
         execution_input=lambda state: {"request": state["request"]},
         on_violation=ContractViolationAction.RAISE,
-        logger=logging.getLogger("graph_observability_kit.langgraph"),
+        logger=logging.getLogger("graphobs.langgraph"),
     )
 
     result = instrument_contract_run(
@@ -463,7 +463,7 @@ def test_subgraph_contract_run_spec_returns_projected_parent_output(
         span_kind="CHAIN",
         attributes={"graph.subgraph": contract.label},
         on_violation=ContractViolationAction.RAISE,
-        logger=logging.getLogger("graph_observability_kit.langgraph"),
+        logger=logging.getLogger("graphobs.langgraph"),
     )
 
     result = instrument_contract_run(
@@ -489,7 +489,7 @@ def test_subgraph_contract_run_spec_returns_projected_parent_output(
 def test_contract_node_invalid_call_logs_error(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    caplog.set_level(logging.ERROR, logger="graph_observability_kit.langgraph")
+    caplog.set_level(logging.ERROR, logger="graphobs.langgraph")
 
     with pytest.raises(TypeError) as error:
         contract_node(cast(NodeContract, object()))
@@ -637,7 +637,7 @@ def test_contract_subgraph_forwards_config_when_async_supported() -> None:
 def test_contract_subgraph_missing_invoke_logs_original_error(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    caplog.set_level(logging.ERROR, logger="graph_observability_kit.langgraph")
+    caplog.set_level(logging.ERROR, logger="graphobs.langgraph")
     contract = SubgraphContract(
         parent_input=("request.text",),
         parent_output=("answer.text",),
@@ -655,7 +655,7 @@ def test_contract_subgraph_missing_invoke_logs_original_error(
 def test_undeclared_node_write_logs_error_and_raises(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    caplog.set_level(logging.ERROR, logger="graph_observability_kit.langgraph")
+    caplog.set_level(logging.ERROR, logger="graphobs.langgraph")
 
     def classify(state: MappingState) -> MappingState:
         return {"unexpected": "nope"}
@@ -673,7 +673,7 @@ def test_undeclared_node_write_logs_error_and_raises(
 def test_undeclared_node_write_can_warn_and_continue(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    caplog.set_level(logging.WARNING, logger="graph_observability_kit.contracts")
+    caplog.set_level(logging.WARNING, logger="graphobs.contracts")
 
     def classify(state: MappingState) -> MappingState:
         return {"unexpected": "nope"}
@@ -697,7 +697,7 @@ def test_node_exception_logs_error_and_records_span_failure(
     caplog: pytest.LogCaptureFixture,
     span_exporter: InMemorySpanExporter,
 ) -> None:
-    caplog.set_level(logging.ERROR, logger="graph_observability_kit.langgraph")
+    caplog.set_level(logging.ERROR, logger="graphobs.langgraph")
 
     def failing_node(state: MappingState) -> MappingState:
         raise RuntimeError("synthetic node failure")
@@ -777,7 +777,7 @@ def test_langgraph_input_schema_includes_subgraph_private_state() -> None:
 def test_open_projection_schema_logs_warning(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    caplog.set_level(logging.WARNING, logger="graph_observability_kit.langgraph")
+    caplog.set_level(logging.WARNING, logger="graphobs.langgraph")
 
     contract = NodeContract(name="open_reader", reads=ProjectionPolicy(), writes=())
 

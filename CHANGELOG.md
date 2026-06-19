@@ -21,7 +21,7 @@ This project follows Semantic Versioning once public releases begin.
 ## 0.1.0 - 2026-06-17
 
 - Establish public repository foundation.
-- Add package skeleton for `graph_observability_kit`.
+- Add package skeleton for `graphobs`.
 - Add docs, tests, examples, and CI scaffolding.
 - Add runtime-independent state contract models and projection helpers.
 - Add OpenTelemetry/OpenInference tracing helpers with compact payloads.

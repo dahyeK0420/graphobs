@@ -5,7 +5,7 @@ from typing import cast
 
 import pytest
 
-from graph_observability_kit.contracts.models import (
+from graphobs.contracts.models import (
     Contract,
     ContractViolationAction,
     NodeContract,
@@ -13,15 +13,15 @@ from graph_observability_kit.contracts.models import (
     StateContractError,
     SubgraphContract,
 )
-from graph_observability_kit.contracts.projection import (
+from graphobs.contracts.projection import (
     project_input,
     project_node_payload,
     project_output,
 )
-from graph_observability_kit.contracts.validation import (
+from graphobs.contracts.validation import (
     validate_update,
 )
-from graph_observability_kit.state.paths import state_diff
+from graphobs.state.paths import state_diff
 
 
 def test_node_contract_exposes_contract_interface() -> None:
@@ -143,7 +143,7 @@ def test_project_node_payload_projects_input_or_output() -> None:
 def test_project_node_payload_can_fall_back_to_summary(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    caplog.set_level(logging.WARNING, logger="graph_observability_kit.contracts")
+    caplog.set_level(logging.WARNING, logger="graphobs.contracts")
     contract = cast(Contract, ContractWithFailingPolicies())
     payload = {"request": {"text": "hello", "raw": "hidden"}}
 
@@ -208,7 +208,7 @@ def test_validate_update_rejects_undeclared_public_writes() -> None:
 def test_validate_update_logs_hard_error_with_original_message(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    caplog.set_level(logging.ERROR, logger="graph_observability_kit.contracts")
+    caplog.set_level(logging.ERROR, logger="graphobs.contracts")
     contract = NodeContract(name="retrieve", writes=("documents",))
 
     with pytest.raises(StateContractError) as error:
@@ -221,7 +221,7 @@ def test_validate_update_logs_hard_error_with_original_message(
 def test_validate_update_can_warn_and_continue(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    caplog.set_level(logging.WARNING, logger="graph_observability_kit.contracts")
+    caplog.set_level(logging.WARNING, logger="graphobs.contracts")
     contract = NodeContract(name="retrieve", writes=("documents",))
     expected_error = StateContractError("retrieve", ("debug.enabled",))
 

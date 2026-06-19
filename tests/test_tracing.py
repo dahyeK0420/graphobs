@@ -10,7 +10,7 @@ from opentelemetry.sdk.trace.export.in_memory_span_exporter import (
 )
 from opentelemetry.trace import StatusCode
 
-from graph_observability_kit.tracing import (
+from graphobs.tracing import (
     TracePayloadMode,
     default_payload_serializer,
     mark_span_error,
@@ -174,7 +174,7 @@ def test_unsupported_attribute_value_logs_warning(
     caplog: pytest.LogCaptureFixture,
     span_exporter: InMemorySpanExporter,
 ) -> None:
-    caplog.set_level(logging.WARNING, logger="graph_observability_kit.tracing")
+    caplog.set_level(logging.WARNING, logger="graphobs.tracing")
 
     with start_graph_span("attributes", "CHAIN") as span:
         set_span_attributes(span, {"bad": object(), "good": True})
@@ -193,7 +193,7 @@ def test_unsupported_attribute_value_logs_warning(
 def test_full_mode_serialization_error_logs_and_raises(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    caplog.set_level(logging.ERROR, logger="graph_observability_kit.tracing")
+    caplog.set_level(logging.ERROR, logger="graphobs.tracing")
 
     with (
         pytest.raises(TypeError),

@@ -8,4 +8,4 @@ classes, payload summary helpers, and tracing helpers.
 `contract_node` can wrap a function directly or decorate it with
 `@contract_node(contract)`.
 
-::: graph_observability_kit
+::: graphobs

@@ -6,7 +6,7 @@ This repository is intended to remain public, vendor-neutral, and example-driven
 
 - Use `uv` for dependency management and command execution.
 - Keep runtime dependencies minimal until a phase explicitly requires them.
-- Put Python source under `src/graph_observability_kit/`.
+- Put Python source under `src/graphobs/`.
 - Keep public APIs typed, documented, and exported intentionally.
 - Use synthetic examples and fixtures only.
 - Do not include organization-specific, product-specific, deployment-specific, or private runtime details in public docs, examples, tests, package names, comments, or exported APIs.

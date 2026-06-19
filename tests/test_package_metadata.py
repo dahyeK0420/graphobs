@@ -5,12 +5,12 @@ from importlib.resources import files
 
 
 def test_distribution_metadata() -> None:
-    package_metadata = metadata("graph-observability-kit")
+    package_metadata = metadata("graphobs")
 
-    assert version("graph-observability-kit") == "0.2.0"
-    assert package_metadata["Name"] == "graph-observability-kit"
+    assert version("graphobs") == "0.2.0"
+    assert package_metadata["Name"] == "graphobs"
     assert package_metadata["License-Expression"] == "Apache-2.0"
 
 
 def test_package_ships_type_marker() -> None:
-    assert files("graph_observability_kit").joinpath("py.typed").is_file()
+    assert files("graphobs").joinpath("py.typed").is_file()

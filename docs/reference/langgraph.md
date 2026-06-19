@@ -6,8 +6,8 @@ same contract model used by the core projection and validation helpers.
 `add_contract_node` registers the node under `contract.label`, so the graph node
 name stays aligned with the contract's public label.
 
-::: graph_observability_kit.langgraph.nodes
+::: graphobs.langgraph.nodes
 
-::: graph_observability_kit.langgraph.subgraphs
+::: graphobs.langgraph.subgraphs
 
-::: graph_observability_kit.langgraph.schemas
+::: graphobs.langgraph.schemas

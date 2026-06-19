@@ -6,17 +6,17 @@ from typing import Any, TypedDict, cast
 import pytest
 from langgraph.graph import END, START, StateGraph
 
-from graph_observability_kit.contracts.models import (
+from graphobs.contracts.models import (
     Contract,
     NodeContract,
     ProjectionPolicy,
 )
-from graph_observability_kit.langgraph.callbacks import (
+from graphobs.langgraph.callbacks import (
     ProjectedCallbackHandler,
     ProjectionStats,
     project_callback_payloads,
 )
-from graph_observability_kit.payloads import shape_summary
+from graphobs.payloads import shape_summary
 
 LARGE_VALUE = "do not expose this full callback value " * 20
 
@@ -121,7 +121,7 @@ def test_projection_stats_report_matched_unmatched_and_missing_contracts(
 ) -> None:
     caplog.set_level(
         logging.DEBUG,
-        logger="graph_observability_kit.langgraph.callbacks",
+        logger="graphobs.langgraph.callbacks",
     )
     callback = _RecordingCallback()
     answer_contract = NodeContract(

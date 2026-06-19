@@ -10,12 +10,12 @@ from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import ConsoleSpanExporter, SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
-from graph_observability_kit.contracts.models import StateContractError
-from graph_observability_kit.demo.span_records import span_record as span_record
-from graph_observability_kit.demo.span_records import span_records as span_records
-from graph_observability_kit.demo.tracing_setup import configure_local_tracing
-from graph_observability_kit.logging.callback import GraphLogCallback
-from graph_observability_kit.logging.context import LogContext
+from graphobs.contracts.models import StateContractError
+from graphobs.demo.span_records import span_record as span_record
+from graphobs.demo.span_records import span_records as span_records
+from graphobs.demo.tracing_setup import configure_local_tracing
+from graphobs.logging.callback import GraphLogCallback
+from graphobs.logging.context import LogContext
 
 MappingState = Mapping[str, object]
 
@@ -87,7 +87,7 @@ def lifecycle_log_records(
     output_value: Mapping[str, object],
 ) -> list[dict[str, object]]:
     """Creates deterministic lifecycle log records for docs examples."""
-    logger = logging.getLogger(f"examples.graph_observability_kit.{run_name}")
+    logger = logging.getLogger(f"examples.graphobs.{run_name}")
     logger.handlers.clear()
     logger.propagate = False
     logger.setLevel(logging.INFO)

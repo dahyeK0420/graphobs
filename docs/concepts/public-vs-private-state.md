@@ -1,7 +1,7 @@
 # Public Vs Private Graph State
 
 Graph state often mixes data that belongs in a public boundary with details that
-only one implementation step needs. Graph Observability Kit keeps those ideas
+only one implementation step needs. graphobs keeps those ideas
 separate in the contract.
 
 ## Public State
@@ -34,7 +34,7 @@ application controls, careful payload selection, and backend retention choices.
 ## Example
 
 ```python
-from graph_observability_kit import NodeContract
+from graphobs import NodeContract
 
 contract = NodeContract(
     name="rank_documents",

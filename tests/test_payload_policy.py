@@ -6,24 +6,24 @@ from collections.abc import Mapping, Sequence
 
 import pytest
 
-from graph_observability_kit._observability.payload_policy import (
+from graphobs._observability.payload_policy import (
     payload_summary,
     prepare_trace_payload,
     project_contract_payload,
     serialize_trace_payload,
 )
-from graph_observability_kit.contracts.models import NodeContract
-from graph_observability_kit.langgraph.callbacks import project_callback_payloads
-from graph_observability_kit.logging.context import (
+from graphobs.contracts.models import NodeContract
+from graphobs.langgraph.callbacks import project_callback_payloads
+from graphobs.logging.context import (
     CorrelationFields,
     LogContext,
 )
-from graph_observability_kit.logging.lifecycle import (
+from graphobs.logging.lifecycle import (
     build_finish_payload,
     build_start_payload,
 )
-from graph_observability_kit.payloads import message_compact_summary, shape_summary
-from graph_observability_kit.tracing import (
+from graphobs.payloads import message_compact_summary, shape_summary
+from graphobs.tracing import (
     TracePayloadMode,
     default_payload_serializer,
 )
@@ -63,8 +63,8 @@ def test_trace_serializer_delegates_to_payload_policy() -> None:
 def test_projection_fallback_uses_policy_summary_and_safe_warning(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    caplog.set_level(logging.WARNING, logger="graph_observability_kit.contracts")
-    logger = logging.getLogger("graph_observability_kit.contracts")
+    caplog.set_level(logging.WARNING, logger="graphobs.contracts")
+    logger = logging.getLogger("graphobs.contracts")
     payload = {"request": {"text": LARGE_VALUE}}
 
     def failing_project(state: Mapping[str, object]) -> dict[str, object]:

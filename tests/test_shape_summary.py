@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from graph_observability_kit.payloads import message_compact_summary, shape_summary
+from graphobs.payloads import message_compact_summary, shape_summary
 
 
 @pytest.mark.parametrize(

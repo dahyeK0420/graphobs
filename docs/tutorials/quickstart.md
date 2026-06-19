@@ -12,7 +12,7 @@ to send the same spans to Arize Phoenix, LangSmith, MLflow, or Langfuse.
 ## Install and open
 
 ```bash
-pip install "graph-observability-kit[demo]"
+pip install "graphobs[demo]"
 jupyter lab examples/notebooks/quickstart.ipynb
 ```
 
@@ -27,7 +27,7 @@ jupyter lab examples/notebooks/quickstart.ipynb
 | `jupyterlab` | Notebook runtime |
 | `ipykernel` | Python kernel for JupyterLab |
 
-The core package (`graph-observability-kit` without extras) only depends on
+The core package (`graphobs` without extras) only depends on
 `opentelemetry-api`. The SDK and exporters are never pulled into a production
 install unless you opt in.
 
