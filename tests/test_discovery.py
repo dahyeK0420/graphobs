@@ -6,9 +6,9 @@ from collections.abc import Mapping
 
 import pytest
 
-from graph_observability_kit.discovery import (
+from graph_observability_kit.discovery.draft import DiscoveredContract
+from graph_observability_kit.discovery.runner import (
     ContractDiscoveryError,
-    DiscoveredContract,
     adiscover_contract,
     discover_contract,
 )

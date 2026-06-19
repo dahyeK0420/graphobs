@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import ItemsView, Iterator, KeysView, Mapping, ValuesView
 from typing import cast
 
-from graph_observability_kit._state_paths import Path, join_path
+from graph_observability_kit.state.paths import Path, join_path
 
 
 class ReadTracker:

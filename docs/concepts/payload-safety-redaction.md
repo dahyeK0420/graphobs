@@ -92,7 +92,7 @@ Wrap callbacks with `project_callback_payloads` when a downstream callback
 should receive contract-projected node inputs and outputs:
 
 ```python
-from graph_observability_kit.callbacks import project_callback_payloads
+from graph_observability_kit.langgraph.callbacks import project_callback_payloads
 
 config = {
     "callbacks": [

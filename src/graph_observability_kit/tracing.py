@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import logging
 from collections.abc import Iterator, Mapping, Sequence
 from contextlib import contextmanager
@@ -15,7 +14,9 @@ from opentelemetry import trace
 from opentelemetry.trace import Span, Status, StatusCode
 from opentelemetry.util.types import AttributeValue
 
-from graph_observability_kit.payloads import message_compact_summary, shape_summary
+from graph_observability_kit._observability.payload_policy import (
+    serialize_trace_payload,
+)
 
 LOGGER = logging.getLogger(__name__)
 TRACER_NAME = "graph_observability_kit"
@@ -74,17 +75,7 @@ def default_payload_serializer(
         TypeError: If full mode receives a value that is not JSON serializable.
         ValueError: If ``mode`` is not supported.
     """
-    prepared: object
-    if mode is TracePayloadMode.MESSAGE_COMPACT:
-        prepared = message_compact_summary(value)
-    elif mode is TracePayloadMode.COMPACT:
-        prepared = shape_summary(value)
-    elif mode is TracePayloadMode.FULL:
-        prepared = value
-    else:
-        raise ValueError(f"unsupported trace payload mode: {mode!r}")
-
-    return json.dumps(prepared, sort_keys=True, separators=(",", ":"))
+    return serialize_trace_payload(value, mode=mode)
 
 
 @contextmanager

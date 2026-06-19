@@ -18,10 +18,8 @@ from graph_observability_kit import (
     NodeContract,
     add_contract_node,
 )
-from graph_observability_kit.contracts import SubgraphContract
-from graph_observability_kit.langgraph import (
-    contract_subgraph,
-)
+from graph_observability_kit.contracts.models import SubgraphContract
+from graph_observability_kit.langgraph.subgraphs import contract_subgraph
 from graph_observability_kit.tracing import (
     TracePayloadMode,
     set_span_output,

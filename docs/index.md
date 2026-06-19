@@ -24,7 +24,7 @@ uv run python -c "import graph_observability_kit; print(graph_observability_kit.
 
 ```python
 from graph_observability_kit import NodeContract
-from graph_observability_kit.contracts import project_input
+from graph_observability_kit.contracts.projection import project_input
 
 contract = NodeContract(
     name="classify",
@@ -39,7 +39,7 @@ public_input = project_input(contract, state)
 ## Minimal Span
 
 ```python
-from graph_observability_kit.logging import LogContext
+from graph_observability_kit.logging.context import LogContext
 from graph_observability_kit.tracing import start_graph_span
 
 log_context = LogContext(session_id="session-1", request_id="request-1")
@@ -84,7 +84,7 @@ For the full adoption path, see
 
 ```python
 from graph_observability_kit import build_invoke_config
-from graph_observability_kit.logging import LogContext
+from graph_observability_kit.logging.context import LogContext
 
 config = build_invoke_config(LogContext(session_id="session-1"))
 graph.compile().invoke({"request": {"text": "hello"}}, config=config)

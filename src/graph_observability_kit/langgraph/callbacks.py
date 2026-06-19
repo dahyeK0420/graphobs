@@ -5,14 +5,15 @@ from __future__ import annotations
 import logging
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
-from typing import Literal, TypeAlias
+from typing import TypeAlias
 
-from graph_observability_kit.contracts import (
-    Contract,
+from graph_observability_kit._observability.payload_policy import (
+    PayloadKind,
+    project_contract_payload,
 )
-from graph_observability_kit.payloads import message_compact_summary, shape_summary
+from graph_observability_kit.contracts.models import Contract
 
-LOGGER = logging.getLogger(__name__)
+LOGGER = logging.getLogger("graph_observability_kit.langgraph.callbacks")
 LANGGRAPH_NODE_METADATA_KEY = "langgraph_node"
 
 Metadata: TypeAlias = Mapping[str, object]
@@ -307,27 +308,20 @@ def _project_or_summarize(
     contract: Contract,
     payload: Mapping[str, object],
     *,
-    payload_kind: Literal["input", "output"],
+    payload_kind: PayloadKind,
 ) -> Mapping[str, object]:
     policy = (
         contract.input_policy if payload_kind == "input" else contract.output_policy
     )
-    try:
-        projected = policy.project(payload)
-    except Exception as exc:
-        LOGGER.warning(
-            "Could not project %s payload for contract %s; "
-            "using compact summary after %s: %s",
-            payload_kind,
-            contract.label,
-            type(exc).__name__,
-            exc,
-        )
-        return {f"{payload_kind}_summary": shape_summary(payload)}
-    compacted = message_compact_summary(projected)
-    if isinstance(compacted, Mapping):
-        return compacted
-    return projected
+    return project_contract_payload(
+        contract_label=contract.label,
+        payload=payload,
+        payload_kind=payload_kind,
+        project=policy.project,
+        logger=LOGGER,
+        fallback_to_summary=True,
+        compact_projected=True,
+    )
 
 
 def _call_callback_method(

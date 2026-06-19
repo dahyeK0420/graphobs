@@ -1,10 +1,45 @@
 from __future__ import annotations
 
+import importlib.util
+from collections.abc import Sequence
+from types import ModuleType
+
+import pytest
+
 import graph_observability_kit
+import graph_observability_kit.contracts.models as models
+import graph_observability_kit.contracts.projection as projection
+import graph_observability_kit.contracts.validation as validation
+import graph_observability_kit.demo.span_records as span_records
+import graph_observability_kit.demo.tracing_setup as tracing_setup
+import graph_observability_kit.discovery.draft as draft
+import graph_observability_kit.discovery.runner as runner
+import graph_observability_kit.langgraph.callbacks as callbacks
+import graph_observability_kit.langgraph.nodes as nodes
+import graph_observability_kit.langgraph.schemas as schemas
+import graph_observability_kit.langgraph.subgraphs as subgraphs
+import graph_observability_kit.logging.callback as callback
+import graph_observability_kit.logging.context as context
+import graph_observability_kit.logging.invoke_config as invoke_config
+import graph_observability_kit.state.paths as paths
+from graph_observability_kit import payloads, tracing
 
 
 def test_package_imports() -> None:
     assert graph_observability_kit.__version__ == "0.2.0"
+
+
+@pytest.mark.parametrize(
+    "module_name",
+    [
+        "graph_observability_kit._instrumented_execution",
+        "graph_observability_kit._read_tracking",
+        "graph_observability_kit._state_paths",
+        "graph_observability_kit.callbacks",
+    ],
+)
+def test_obsolete_shim_modules_are_removed(module_name: str) -> None:
+    assert importlib.util.find_spec(module_name) is None
 
 
 def test_package_root_exports_headline_interface_only() -> None:
@@ -28,43 +63,177 @@ def test_package_root_exports_headline_interface_only() -> None:
     assert callable(contract_node)
 
 
-def test_deep_apis_remain_available_from_submodules() -> None:
-    from graph_observability_kit.callbacks import (
-        ProjectedCallbackHandler,
-        ProjectionStats,
-        project_callback_payloads,
-    )
-    from graph_observability_kit.contracts import (
+@pytest.mark.parametrize(
+    ("module", "expected_exports"),
+    [
+        (
+            graph_observability_kit,
+            [
+                "NodeContract",
+                "__version__",
+                "add_contract_node",
+                "build_invoke_config",
+                "contract_node",
+            ],
+        ),
+        (
+            models,
+            [
+                "AttributeValue",
+                "Contract",
+                "ContractViolationAction",
+                "NodeContract",
+                "ProjectionPolicy",
+                "ProjectionSpec",
+                "StateContractError",
+                "SubgraphContract",
+            ],
+        ),
+        (
+            projection,
+            [
+                "ContractProjection",
+                "ProjectionPolicyLike",
+                "project_input",
+                "project_node_payload",
+                "project_output",
+                "project_state",
+            ],
+        ),
+        (validation, ["validate_update"]),
+        (
+            paths,
+            [
+                "Path",
+                "StateMapping",
+                "StateUpdate",
+                "delete_path",
+                "get_path",
+                "is_prefix",
+                "iter_update_paths",
+                "join_path",
+                "normalize_optional_paths",
+                "normalize_paths",
+                "set_path",
+                "split_path",
+                "state_diff",
+            ],
+        ),
+        (
+            nodes,
+            [
+                "AsyncNodeFunction",
+                "ContractNodeDecorator",
+                "NodeBuilder",
+                "NodeFunction",
+                "NodeWrapper",
+                "add_contract_node",
+                "contract_node",
+            ],
+        ),
+        (
+            subgraphs,
+            ["AsyncInvokableGraph", "InvokableGraph", "contract_subgraph"],
+        ),
+        (schemas, ["TypedDictFactory", "langgraph_input_schema"]),
+        (
+            callbacks,
+            [
+                "ProjectedCallbackHandler",
+                "ProjectionStats",
+                "project_callback_payloads",
+            ],
+        ),
+        (
+            context,
+            [
+                "CorrelationFields",
+                "CorrelationValue",
+                "LogContext",
+                "Metadata",
+                "field_names",
+            ],
+        ),
+        (callback, ["GraphLogCallback"]),
+        (invoke_config, ["InvokeConfig", "build_invoke_config"]),
+        (draft, ["DiscoveredContract"]),
+        (
+            runner,
+            [
+                "AsyncDiscoveryNode",
+                "ContractDiscoveryError",
+                "SyncDiscoveryNode",
+                "adiscover_contract",
+                "discover_contract",
+            ],
+        ),
+        (
+            tracing_setup,
+            [
+                "configure_local_tracing",
+                "configure_otlp_tracing",
+                "configure_phoenix_tracing",
+            ],
+        ),
+        (span_records, ["span_record", "span_records"]),
+        (payloads, ["message_compact_summary", "shape_summary"]),
+        (
+            tracing,
+            [
+                "PayloadSerializer",
+                "TracePayloadMode",
+                "default_payload_serializer",
+                "mark_span_error",
+                "set_span_attributes",
+                "set_span_input",
+                "set_span_output",
+                "start_graph_span",
+            ],
+        ),
+    ],
+)
+def test_public_module_exports_are_stable(
+    module: ModuleType,
+    expected_exports: Sequence[str],
+) -> None:
+    assert module.__all__ == list(expected_exports)
+
+
+def test_concrete_public_modules_expose_expected_objects() -> None:
+    from graph_observability_kit.contracts.models import (
         Contract,
         ContractViolationAction,
         ProjectionPolicy,
         StateContractError,
         SubgraphContract,
+    )
+    from graph_observability_kit.contracts.projection import (
         project_input,
         project_node_payload,
         project_output,
-        state_diff,
-        validate_update,
     )
-    from graph_observability_kit.discovery import (
+    from graph_observability_kit.contracts.validation import validate_update
+    from graph_observability_kit.discovery.draft import DiscoveredContract
+    from graph_observability_kit.discovery.runner import (
         ContractDiscoveryError,
-        DiscoveredContract,
         adiscover_contract,
         discover_contract,
     )
-    from graph_observability_kit.langgraph import (
-        AsyncInvokableGraph,
+    from graph_observability_kit.langgraph.callbacks import (
+        ProjectedCallbackHandler,
+        ProjectionStats,
+        project_callback_payloads,
+    )
+    from graph_observability_kit.langgraph.nodes import NodeBuilder
+    from graph_observability_kit.langgraph.schemas import langgraph_input_schema
+    from graph_observability_kit.langgraph.subgraphs import (
         InvokableGraph,
-        NodeBuilder,
         contract_subgraph,
-        langgraph_input_schema,
     )
-    from graph_observability_kit.logging import (
-        CorrelationFields,
-        GraphLogCallback,
-        LogContext,
-    )
+    from graph_observability_kit.logging.callback import GraphLogCallback
+    from graph_observability_kit.logging.context import CorrelationFields, LogContext
     from graph_observability_kit.payloads import shape_summary
+    from graph_observability_kit.state.paths import state_diff
     from graph_observability_kit.tracing import (
         PayloadSerializer,
         TracePayloadMode,
@@ -76,7 +245,6 @@ def test_deep_apis_remain_available_from_submodules() -> None:
         start_graph_span,
     )
 
-    assert AsyncInvokableGraph.__name__ == "AsyncInvokableGraph"
     assert Contract.__name__ == "Contract"
     assert ContractDiscoveryError.__name__ == "ContractDiscoveryError"
     assert ContractViolationAction.WARN.value == "warn"

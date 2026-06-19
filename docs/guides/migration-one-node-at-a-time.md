@@ -46,7 +46,7 @@ Use callback projection when the node should continue receiving the same state
 as before, but downstream callbacks should see contract-projected payloads:
 
 ```python
-from graph_observability_kit.callbacks import project_callback_payloads
+from graph_observability_kit.langgraph.callbacks import project_callback_payloads
 
 config = {
     "callbacks": [
@@ -70,7 +70,7 @@ namespace-managed state that is not fully declared yet:
 
 ```python
 from graph_observability_kit import contract_node
-from graph_observability_kit.contracts import ContractViolationAction
+from graph_observability_kit.contracts.models import ContractViolationAction
 
 graph.add_node(
     "classify",
@@ -130,7 +130,7 @@ During early adoption, you can log undeclared writes and continue instead of
 raising immediately:
 
 ```python
-from graph_observability_kit.contracts import ContractViolationAction
+from graph_observability_kit.contracts.models import ContractViolationAction
 
 graph.add_node(
     "classify",
@@ -151,7 +151,7 @@ Run the same graph invocation you already use. If the node returns an undeclared
 path, `StateContractError` points to the boundary mismatch.
 
 ```python
-from graph_observability_kit.contracts import StateContractError
+from graph_observability_kit.contracts.models import StateContractError
 
 try:
     app.invoke({"request": {"text": "hello"}})
@@ -163,7 +163,7 @@ except StateContractError as exc:
 
 ```python
 from graph_observability_kit import build_invoke_config
-from graph_observability_kit.logging import LogContext
+from graph_observability_kit.logging.context import LogContext
 
 config = build_invoke_config(
     LogContext(session_id="session-1", request_id="request-1"),

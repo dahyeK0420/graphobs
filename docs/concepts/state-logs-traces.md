@@ -30,7 +30,7 @@ should share correlation fields.
 
 LangGraph node callbacks may receive the graph runtime's outer chain payload
 even when a node is wrapped with a contract. Use
-`graph_observability_kit.callbacks.project_callback_payloads` around callbacks
+`graph_observability_kit.langgraph.callbacks.project_callback_payloads` around callbacks
 that should see the contract-projected node input and output instead. Root graph
 events and unknown nodes pass through unchanged.
 

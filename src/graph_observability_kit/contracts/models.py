@@ -1,32 +1,19 @@
-"""State contract models and projection helpers."""
+"""State contract models."""
 
 from __future__ import annotations
 
-import logging
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from enum import StrEnum
 from types import MappingProxyType
-from typing import Literal, Protocol, TypeAlias
+from typing import Protocol, TypeAlias
 
-from graph_observability_kit._state_paths import (
-    Path,
+from graph_observability_kit.contracts.projection import project_state
+from graph_observability_kit.state.paths import (
     StateMapping,
-    StateUpdate,
-    delete_path,
-    get_path,
-    is_prefix,
-    iter_update_paths,
-    join_path,
     normalize_optional_paths,
     normalize_paths,
-    set_path,
-    split_path,
-    state_diff,
 )
-from graph_observability_kit.payloads import shape_summary
-
-LOGGER = logging.getLogger(__name__)
 
 AttributeValue = str | int | float | bool | None
 
@@ -92,9 +79,9 @@ class ProjectionPolicy:
             exclude: Dotted paths to remove from the projected state.
             summarize: Dotted paths to replace with compact summary metadata.
         """
-        object.__setattr__(self, "include", _normalize_optional_paths(include))
-        object.__setattr__(self, "exclude", _normalize_paths(exclude))
-        object.__setattr__(self, "summarize", _normalize_paths(summarize))
+        object.__setattr__(self, "include", normalize_optional_paths(include))
+        object.__setattr__(self, "exclude", normalize_paths(exclude))
+        object.__setattr__(self, "summarize", normalize_paths(summarize))
 
     def project(self, state: StateMapping) -> dict[str, object]:
         """Projects state according to this policy.
@@ -105,7 +92,7 @@ class ProjectionPolicy:
         Returns:
             A new dictionary containing only the selected public state.
         """
-        return _project_state(self, state)
+        return project_state(self, state)
 
 
 ProjectionSpec: TypeAlias = ProjectionPolicy | Iterable[str]
@@ -264,156 +251,10 @@ class SubgraphContract:
         )
 
 
-def project_input(
-    contract: Contract,
-    state: StateMapping,
-) -> dict[str, object]:
-    """Projects public input state for a node or subgraph contract.
-
-    Args:
-        contract: Contract that declares the public input boundary.
-        state: Full graph state.
-
-    Returns:
-        A new dictionary containing only public input state.
-    """
-    return contract.input_policy.project(state)
-
-
-def project_output(
-    contract: Contract,
-    before_state: StateMapping,
-    after_state: StateMapping,
-) -> dict[str, object]:
-    """Projects changed public output state for a node or subgraph contract.
-
-    Args:
-        contract: Contract that declares the public output boundary.
-        before_state: State before execution.
-        after_state: State after execution.
-
-    Returns:
-        A new dictionary containing changed public output paths only.
-    """
-    policy = contract.output_policy
-    before_projection = policy.project(before_state)
-    after_projection = policy.project(after_state)
-    return state_diff(before_projection, after_projection)
-
-
-def project_node_payload(
-    contract: Contract,
-    payload: StateMapping,
-    kind: Literal["input", "output"],
-    *,
-    fallback_to_summary: bool = False,
-) -> dict[str, object]:
-    """Projects one input or output payload through a contract policy.
-
-    Args:
-        contract: Contract that declares the payload boundary.
-        payload: Input or output payload to project.
-        kind: Which public contract policy to use.
-        fallback_to_summary: Whether projection failures should return a
-            compact shape summary instead of raising.
-
-    Returns:
-        A projected payload, or a compact summary when fallback is enabled and
-        projection fails.
-
-    Raises:
-        ValueError: If ``kind`` is not a supported payload direction.
-        Exception: Re-raises projection errors when fallback is disabled.
-    """
-    if kind not in ("input", "output"):
-        raise ValueError(f"unsupported payload kind: {kind!r}")
-
-    try:
-        if kind == "input":
-            return contract.input_policy.project(payload)
-        return contract.output_policy.project(payload)
-    except Exception as exc:
-        if not fallback_to_summary:
-            raise
-        LOGGER.warning(
-            "Could not project %s payload for contract %s; "
-            "using compact summary after %s: %s",
-            kind,
-            contract.label,
-            type(exc).__name__,
-            exc,
-        )
-        return {f"{kind}_summary": shape_summary(payload)}
-
-
-def validate_update(
-    contract: Contract,
-    update: StateUpdate,
-    *,
-    on_violation: ContractViolationAction = ContractViolationAction.RAISE,
-) -> None:
-    """Validates that an update only writes declared paths.
-
-    Args:
-        contract: Contract that declares allowed public and private writes.
-        update: State update returned by a node or subgraph.
-        on_violation: Whether undeclared writes raise or log a warning.
-
-    Raises:
-        StateContractError: If any update path is not declared by the contract
-            and ``on_violation`` is ``ContractViolationAction.RAISE``.
-    """
-    undeclared = [
-        join_path(path)
-        for path in iter_update_paths(update)
-        if not any(
-            _path_allowed_by_policy(path, policy) for policy in contract.write_policies
-        )
-    ]
-    if undeclared:
-        error = StateContractError(contract.label, undeclared)
-        if on_violation == ContractViolationAction.WARN:
-            LOGGER.warning("%s", error)
-            return
-        LOGGER.error("%s", error)
-        raise error
-
-
 def _coerce_projection(spec: ProjectionSpec) -> ProjectionPolicy:
     if isinstance(spec, ProjectionPolicy):
         return spec
     return ProjectionPolicy(include=spec)
-
-
-def _project_state(policy: ProjectionPolicy, state: StateMapping) -> dict[str, object]:
-    if policy.include is None:
-        projected: dict[str, object] = dict(state)
-    else:
-        projected = {}
-        for path_text in policy.include:
-            path = split_path(path_text)
-            found, value = get_path(state, path)
-            if found:
-                set_path(projected, path, value)
-
-    for path_text in policy.exclude:
-        delete_path(projected, split_path(path_text))
-
-    for path_text in policy.summarize:
-        path = split_path(path_text)
-        found, value = get_path(projected, path)
-        if found:
-            set_path(projected, path, shape_summary(value))
-
-    return projected
-
-
-def _normalize_optional_paths(paths: Iterable[str] | None) -> tuple[str, ...] | None:
-    return normalize_optional_paths(paths)
-
-
-def _normalize_paths(paths: Iterable[str]) -> tuple[str, ...]:
-    return normalize_paths(paths)
 
 
 def _validate_name(value: str, field_name: str) -> str:
@@ -422,35 +263,13 @@ def _validate_name(value: str, field_name: str) -> str:
     return value
 
 
-def _path_allowed_by_policy(path: Path, policy: ProjectionPolicy) -> bool:
-    include_paths = (
-        None
-        if policy.include is None
-        else tuple(split_path(path_text) for path_text in policy.include)
-    )
-    included = include_paths is None or any(
-        is_prefix(allowed_path, path) for allowed_path in include_paths
-    )
-    if not included:
-        return False
-
-    exclude_paths = tuple(split_path(path_text) for path_text in policy.exclude)
-    return not any(
-        is_prefix(excluded_path, path) or is_prefix(path, excluded_path)
-        for excluded_path in exclude_paths
-    )
-
-
 __all__ = [
+    "AttributeValue",
     "Contract",
     "ContractViolationAction",
     "NodeContract",
     "ProjectionPolicy",
+    "ProjectionSpec",
     "StateContractError",
     "SubgraphContract",
-    "project_input",
-    "project_node_payload",
-    "project_output",
-    "state_diff",
-    "validate_update",
 ]

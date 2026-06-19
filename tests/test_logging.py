@@ -7,12 +7,12 @@ from uuid import uuid4
 import pytest
 from langgraph.graph import END, START, StateGraph
 
-from graph_observability_kit.logging import (
+from graph_observability_kit.logging.callback import GraphLogCallback
+from graph_observability_kit.logging.context import (
     CorrelationFields,
-    GraphLogCallback,
     LogContext,
-    build_invoke_config,
 )
+from graph_observability_kit.logging.invoke_config import build_invoke_config
 from graph_observability_kit.tracing import (
     start_graph_span,
 )
@@ -224,6 +224,19 @@ def test_missing_start_time_warns_and_still_emits_end(
     assert output_summary["keys"] == ["answer"]
 
 
+def test_callback_flags_match_langchain_expectations() -> None:
+    assert GraphLogCallback.raise_error is True
+    assert GraphLogCallback.run_inline is False
+    assert GraphLogCallback.ignore_chain is False
+    assert GraphLogCallback.ignore_tool is False
+    assert GraphLogCallback.ignore_llm is True
+    assert GraphLogCallback.ignore_retry is True
+    assert GraphLogCallback.ignore_agent is True
+    assert GraphLogCallback.ignore_retriever is True
+    assert GraphLogCallback.ignore_chat_model is True
+    assert GraphLogCallback.ignore_custom_event is True
+
+
 def test_logger_injection_uses_custom_logger() -> None:
     logger = logging.getLogger("tests.graph_observability_kit.custom_logs")
     logger.handlers.clear()
@@ -231,15 +244,23 @@ def test_logger_injection_uses_custom_logger() -> None:
     logger.setLevel(logging.INFO)
     handler = _CollectingHandler()
     logger.addHandler(handler)
+    run_id = uuid4()
 
     GraphLogCallback(LogContext(turn_id="turn-1"), logger=logger).on_chain_start(
         {"name": "custom"},
         {},
-        run_id=uuid4(),
+        run_id=run_id,
     )
 
     assert len(handler.records) == 1
-    graph_log = cast(dict[str, object], vars(handler.records[0])["graph_log"])
+    record_values = vars(handler.records[0])
+    graph_log = cast(dict[str, object], record_values["graph_log"])
+    assert record_values["graph_log_event"] == "chain_start"
+    assert graph_log["event"] == "chain_start"
+    assert graph_log["run_id"] == str(run_id)
+    assert graph_log["parent_run_id"] is None
+    assert graph_log["metadata_keys"] == ()
+    assert graph_log["tags"] == ()
     assert graph_log["turn_id"] == "turn-1"
 
 

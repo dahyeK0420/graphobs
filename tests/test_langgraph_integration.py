@@ -17,19 +17,26 @@ from opentelemetry.sdk.trace.export.in_memory_span_exporter import (
     InMemorySpanExporter,
 )
 
-from graph_observability_kit.contracts import (
+from graph_observability_kit.contracts.models import (
     ContractViolationAction,
     NodeContract,
     ProjectionPolicy,
     StateContractError,
     SubgraphContract,
 )
-from graph_observability_kit.langgraph import (
-    InvokableGraph,
+from graph_observability_kit.langgraph.execution import (
+    instrument_contract_run,
+    node_contract_run_spec,
+    subgraph_contract_run_spec,
+)
+from graph_observability_kit.langgraph.nodes import (
     add_contract_node,
     contract_node,
+)
+from graph_observability_kit.langgraph.schemas import langgraph_input_schema
+from graph_observability_kit.langgraph.subgraphs import (
+    InvokableGraph,
     contract_subgraph,
-    langgraph_input_schema,
 )
 
 
@@ -403,6 +410,80 @@ def test_contract_node_decorator_wraps_async_node(
     assert result == {"classification": {"label": "greeting"}}
     span = span_exporter.get_finished_spans()[0]
     assert span.name == "decorated_async_classify"
+
+
+def test_node_contract_run_spec_returns_update_and_projects_span_output(
+    span_exporter: InMemorySpanExporter,
+) -> None:
+    contract = NodeContract(
+        name="spec_classify",
+        reads=("request.text",),
+        writes=("classification.label",),
+        private_writes=("scratch.step",),
+    )
+    spec = node_contract_run_spec(
+        contract,
+        span_kind="CHAIN",
+        attributes={"graph.node": contract.label},
+        execution_input=lambda state: {"request": state["request"]},
+        on_violation=ContractViolationAction.RAISE,
+        logger=logging.getLogger("graph_observability_kit.langgraph"),
+    )
+
+    result = instrument_contract_run(
+        spec,
+        {"request": {"text": "hello", "raw": "hidden"}},
+        execute=lambda _run_input: {
+            "classification": {"label": "greeting"},
+            "scratch": {"step": 1},
+        },
+    )
+
+    assert result == {"classification": {"label": "greeting"}, "scratch": {"step": 1}}
+    span = span_exporter.get_finished_spans()[0]
+    assert span.attributes is not None
+    output_value = span.attributes[SpanAttributes.OUTPUT_VALUE]
+    assert isinstance(output_value, str)
+    assert json.loads(output_value) == {
+        "classification": {"label": {"type": "str", "length": 8}},
+    }
+
+
+def test_subgraph_contract_run_spec_returns_projected_parent_output(
+    span_exporter: InMemorySpanExporter,
+) -> None:
+    contract = SubgraphContract(
+        parent_input=("request.text",),
+        parent_output=("answer.text",),
+        private_state_keys=("scratch",),
+        owner_namespace="spec_answer_subgraph",
+    )
+    spec = subgraph_contract_run_spec(
+        contract,
+        span_kind="CHAIN",
+        attributes={"graph.subgraph": contract.label},
+        on_violation=ContractViolationAction.RAISE,
+        logger=logging.getLogger("graph_observability_kit.langgraph"),
+    )
+
+    result = instrument_contract_run(
+        spec,
+        {"request": {"text": "hello", "raw": "hidden"}, "scratch": {"step": 1}},
+        execute=lambda _run_input: {
+            "request": {"text": "hello"},
+            "answer": {"text": "done"},
+            "scratch": {"step": 2},
+        },
+    )
+
+    assert result == {"answer": {"text": "done"}}
+    span = span_exporter.get_finished_spans()[0]
+    assert span.attributes is not None
+    output_value = span.attributes[SpanAttributes.OUTPUT_VALUE]
+    assert isinstance(output_value, str)
+    assert json.loads(output_value) == {
+        "answer": {"text": {"type": "str", "length": 4}},
+    }
 
 
 def test_contract_node_invalid_call_logs_error(

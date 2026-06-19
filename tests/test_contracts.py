@@ -5,19 +5,23 @@ from typing import cast
 
 import pytest
 
-from graph_observability_kit.contracts import (
+from graph_observability_kit.contracts.models import (
     Contract,
     ContractViolationAction,
     NodeContract,
     ProjectionPolicy,
     StateContractError,
     SubgraphContract,
+)
+from graph_observability_kit.contracts.projection import (
     project_input,
     project_node_payload,
     project_output,
-    state_diff,
+)
+from graph_observability_kit.contracts.validation import (
     validate_update,
 )
+from graph_observability_kit.state.paths import state_diff
 
 
 def test_node_contract_exposes_contract_interface() -> None:

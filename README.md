@@ -107,7 +107,7 @@ logging, and tracing primitives remain available from focused submodules.
 
 ```python
 from graph_observability_kit import NodeContract
-from graph_observability_kit.contracts import project_input
+from graph_observability_kit.contracts.projection import project_input
 
 contract = NodeContract(
     name="classify",
@@ -135,7 +135,7 @@ Callback projection is the lowest-risk migration path because the node still
 receives the graph state LangGraph would normally provide:
 
 ```python
-from graph_observability_kit.callbacks import project_callback_payloads
+from graph_observability_kit.langgraph.callbacks import project_callback_payloads
 
 config = {
     "callbacks": [
@@ -166,7 +166,7 @@ with pass-through execution and read auditing:
 
 ```python
 from graph_observability_kit import NodeContract, contract_node
-from graph_observability_kit.contracts import ContractViolationAction
+from graph_observability_kit.contracts.models import ContractViolationAction
 
 classify_contract = NodeContract(
     name="classify",
@@ -211,7 +211,7 @@ durations. They do not configure a logging backend or store full graph state.
 
 ```python
 from graph_observability_kit import build_invoke_config
-from graph_observability_kit.logging import LogContext
+from graph_observability_kit.logging.context import LogContext
 
 config = build_invoke_config(
     LogContext(session_id="session-1", request_id="request-1"),

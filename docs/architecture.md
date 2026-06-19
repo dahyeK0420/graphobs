@@ -2,22 +2,51 @@
 
 Graph Observability Kit is organized as a small public Python library with source under `src/graph_observability_kit`.
 
-## Current Shape
+## Final Package Shape
 
 ```text
 src/graph_observability_kit/
   __init__.py
   _version.py
   payloads.py
-  _state_paths.py
-  _instrumented_execution.py
-  contracts.py
-  discovery.py
-  callbacks.py
-  langgraph.py
-  logging.py
   tracing.py
   py.typed
+  contracts/
+    __init__.py
+    models.py
+    projection.py
+    validation.py
+  state/
+    __init__.py
+    observed_access.py
+    paths.py
+    policies.py
+    read_tracking.py
+  langgraph/
+    __init__.py
+    callbacks.py
+    execution.py
+    nodes.py
+    read_audit.py
+    schemas.py
+    subgraphs.py
+  _observability/
+    __init__.py
+    payload_policy.py
+  logging/
+    __init__.py
+    callback.py
+    context.py
+    invoke_config.py
+    lifecycle.py
+  discovery/
+    __init__.py
+    draft.py
+    runner.py
+  demo/
+    __init__.py
+    span_records.py
+    tracing_setup.py
 tests/
 examples/
 docs/
@@ -73,10 +102,11 @@ tracing. The tracing `PayloadSerializer` protocol is the customization point for
 applications that need additional redaction rules before payloads are
 serialized.
 
-Dotted state path operations and state diffs are implemented once in an
-internal helper and reused by contracts and LangGraph integration code. The
-package root exposes a short headline interface; lower-level primitives remain
-available from their focused submodules.
+Dotted state path operations, observed read classification, private override
+splitting, and state diffs are implemented once in the `state` package and
+reused by contracts, discovery, and LangGraph integration code. The package root
+exposes a short headline interface; lower-level primitives remain available
+from their concrete implementation modules.
 
 The discovery module is runtime-independent. It runs sync or async node
 functions against synthetic samples, records observed mapping reads and returned
