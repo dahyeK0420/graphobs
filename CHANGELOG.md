@@ -4,8 +4,6 @@ All notable changes to this project will be documented in this file.
 
 This project follows Semantic Versioning once public releases begin.
 
-## Unreleased
-
 ## 0.3.0 - 2026-07-11
 
 - Breaking: strict `contract_node` execution now enforces declared reads. A read
