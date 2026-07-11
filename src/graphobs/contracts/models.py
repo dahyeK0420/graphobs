@@ -6,7 +6,7 @@ from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from enum import StrEnum
 from types import MappingProxyType
-from typing import Protocol, TypeAlias
+from typing import Literal, Protocol, TypeAlias
 
 from graphobs.contracts.projection import project_state
 from graphobs.state.paths import (
@@ -16,6 +16,7 @@ from graphobs.state.paths import (
 )
 
 AttributeValue = str | int | float | bool | None
+StateAccess: TypeAlias = Literal["read", "write"]
 
 
 class ContractViolationAction(StrEnum):
@@ -26,23 +27,33 @@ class ContractViolationAction(StrEnum):
 
 
 class StateContractError(ValueError):
-    """Raised when an update writes keys that a contract did not declare."""
+    """Raised when a node reads or writes state paths a contract did not declare."""
 
     contract_name: str
     undeclared_paths: tuple[str, ...]
+    access: StateAccess
 
-    def __init__(self, contract_name: str, undeclared_paths: Iterable[str]) -> None:
+    def __init__(
+        self,
+        contract_name: str,
+        undeclared_paths: Iterable[str],
+        *,
+        access: StateAccess = "write",
+    ) -> None:
         """Creates an error without storing state values.
 
         Args:
             contract_name: Human-readable contract label.
             undeclared_paths: Dotted state paths that were not declared.
+            access: Whether the undeclared paths were read or written.
         """
         self.contract_name = contract_name
         self.undeclared_paths = tuple(sorted(undeclared_paths))
+        self.access = access
+        verb = "read" if access == "read" else "wrote"
         joined_paths = ", ".join(self.undeclared_paths)
         message = (
-            f"Contract {contract_name!r} wrote undeclared state paths: {joined_paths}"
+            f"Contract {contract_name!r} {verb} undeclared state paths: {joined_paths}"
         )
         super().__init__(message)
 
@@ -132,6 +143,11 @@ class NodeContract:
 
     Private keys are part of the contract for validation, but they are not
     returned by the public projection helpers. They are not a security boundary.
+
+    Omitting ``reads`` or ``writes`` declares an empty boundary, not "all
+    state". A contract with no declared reads grants the node no public state
+    under strict execution, so any read then fails per ``on_violation``. Pass
+    ``ProjectionPolicy(include=None)`` explicitly to read all state.
     """
 
     label: str

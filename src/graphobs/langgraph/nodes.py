@@ -20,7 +20,7 @@ from graphobs.langgraph.execution import (
     node_contract_run_spec,
 )
 from graphobs.langgraph.read_audit import (
-    warn_undeclared_reads,
+    enforce_undeclared_reads,
 )
 from graphobs.langgraph.schemas import (
     langgraph_input_schema,
@@ -104,14 +104,20 @@ def contract_node(
     The helper can be called as ``contract_node(fn, contract)`` or used as a
     decorator with ``@contract_node(contract)``.
 
+    Strict execution audits reads and enforces them with ``on_violation``, so a
+    read outside the contract raises ``StateContractError`` by default instead
+    of silently resolving to a projected default value.
+
     Args:
         fn: Node function to wrap, or a contract when used as a decorator.
         contract: Node state and trace contract for explicit wrapping.
-        on_violation: Whether undeclared writes raise or log a warning.
+        on_violation: Whether undeclared writes, and undeclared reads in strict
+            execution, raise or log a warning.
         pass_through_state: Whether the wrapped node should receive the
             original graph state instead of projected execution input.
-        audit_reads: Whether observed state reads should warn when they are not
-            declared by public or private read policies.
+        audit_reads: In pass-through execution, whether undeclared reads log a
+            warning. Strict execution always audits reads and enforces them
+            with ``on_violation``.
 
     Returns:
         A callable with the same sync or async execution style as the original
@@ -158,16 +164,21 @@ def _wrap_contract_node(
     pass_through_state: bool,
     audit_reads: bool,
 ) -> NodeWrapper:
+    track_reads, read_violation = _read_audit_plan(
+        pass_through_state=pass_through_state,
+        audit_reads=audit_reads,
+        on_violation=on_violation,
+    )
     if inspect.iscoroutinefunction(fn):
         async_fn = cast(AsyncNodeFunction, fn)
 
         @wraps(async_fn)
         async def async_wrapper(state: StateMapping, **kwargs: Any) -> StateUpdate:
-            tracker = ReadTracker() if audit_reads else None
+            tracker = ReadTracker() if track_reads else None
 
             async def execute(run_input: StateMapping) -> StateUpdate:
                 update = await async_fn(run_input, **kwargs)
-                warn_undeclared_reads(contract, tracker)
+                enforce_undeclared_reads(contract, tracker, on_violation=read_violation)
                 return update
 
             spec = node_contract_run_spec(
@@ -195,11 +206,11 @@ def _wrap_contract_node(
 
     @wraps(sync_fn)
     def sync_wrapper(state: StateMapping, **kwargs: Any) -> StateUpdate:
-        tracker = ReadTracker() if audit_reads else None
+        tracker = ReadTracker() if track_reads else None
 
         def execute(run_input: StateMapping) -> StateUpdate:
             update = sync_fn(run_input, **kwargs)
-            warn_undeclared_reads(contract, tracker)
+            enforce_undeclared_reads(contract, tracker, on_violation=read_violation)
             return update
 
         spec = node_contract_run_spec(
@@ -239,9 +250,11 @@ def add_contract_node(
         graph: Graph builder exposing ``add_node``.
         contract: Node state and trace contract.
         fn: Synchronous or asynchronous node function.
-        on_violation: Whether undeclared writes raise or log a warning.
+        on_violation: Whether undeclared writes, and undeclared reads in strict
+            execution, raise or log a warning.
         pass_through_state: Whether the node receives the original graph state.
-        audit_reads: Whether undeclared runtime reads should be logged.
+        audit_reads: In pass-through execution, whether undeclared reads are
+            logged. Strict execution always audits reads.
 
     Returns:
         The graph builder returned by ``add_node``.
@@ -262,6 +275,31 @@ def add_contract_node(
     except Exception as exc:
         LOGGER.error("Failed to add contract node %s: %s", contract.label, exc)
         raise
+
+
+def _read_audit_plan(
+    *,
+    pass_through_state: bool,
+    audit_reads: bool,
+    on_violation: ContractViolationAction,
+) -> tuple[bool, ContractViolationAction]:
+    """Decides whether to audit reads and how read violations are handled.
+
+    Strict execution always audits reads and enforces them with the node's
+    violation action, so undeclared reads fail loudly by default instead of
+    silently resolving to a projected value. Pass-through execution keeps
+    auditing opt-in and warning-only, because the node intentionally receives
+    the full graph state. The returned action is unused when reads are not
+    audited.
+
+    Returns:
+        A ``(audit_reads, read_violation)`` pair.
+    """
+    if not pass_through_state:
+        return True, on_violation
+    if audit_reads:
+        return True, ContractViolationAction.WARN
+    return False, on_violation
 
 
 def _node_attributes(contract: NodeContract) -> Mapping[str, object]:

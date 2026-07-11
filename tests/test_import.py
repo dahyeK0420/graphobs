@@ -26,7 +26,7 @@ from graphobs import payloads, tracing
 
 
 def test_package_imports() -> None:
-    assert graphobs.__version__ == "0.2.1"
+    assert graphobs.__version__ == "0.3.0"
 
 
 @pytest.mark.parametrize(

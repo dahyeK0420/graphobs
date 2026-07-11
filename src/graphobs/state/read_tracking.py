@@ -80,6 +80,17 @@ class ReadTrackingMapping(Mapping[str, object]):
         self._tracker.record_children(self._prefix, self._source)
         return super().values()
 
+    def __eq__(self, other: object) -> bool:
+        """Compares the wrapped state without recording an audited read.
+
+        Equality is inspection, not a state read, so it must not add paths to
+        the tracker and trigger spurious undeclared-read violations. Defining
+        ``__eq__`` leaves instances unhashable, matching the wrapped mapping.
+        """
+        if isinstance(other, ReadTrackingMapping):
+            return self._source == other._source
+        return self._source == other
+
     def _wrap_value(self, path: Path, value: object) -> object:
         if isinstance(value, Mapping):
             return ReadTrackingMapping(

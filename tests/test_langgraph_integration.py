@@ -3,12 +3,15 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import operator
 from collections.abc import Mapping
-from typing import TypedDict, cast
+from typing import Annotated, TypedDict, cast
 
 import pytest
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
 from langchain_core.runnables import RunnableConfig
 from langgraph.graph import END, START, StateGraph
+from langgraph.graph.message import add_messages
 from langgraph.runtime import Runtime
 from langgraph.store.base import BaseStore
 from langgraph.store.memory import InMemoryStore
@@ -292,6 +295,74 @@ def test_contract_node_pass_through_and_audit_support_async_nodes(
     assert result == {"classification": {"label": "hello"}}
     assert caplog.messages == [
         "Contract 'async_passthrough_audit' read undeclared state paths: request.raw"
+    ]
+
+
+def test_contract_node_strict_mode_allows_declared_reads() -> None:
+    def classify(state: MappingState) -> MappingState:
+        request = state["request"]
+        assert isinstance(request, Mapping)
+        return {"classification": {"label": str(request["text"])}}
+
+    contract = NodeContract(
+        name="classify_declared",
+        reads=("request.text",),
+        writes=("classification.label",),
+    )
+    wrapped = contract_node(classify, contract)
+
+    result = wrapped({"request": {"text": "hello", "raw": "hidden"}})
+
+    assert result == {"classification": {"label": "hello"}}
+
+
+def test_contract_node_strict_mode_raises_for_undeclared_read() -> None:
+    def classify(state: MappingState) -> MappingState:
+        # Reading a path the contract did not declare must not silently return
+        # a default; strict execution should fail loudly instead.
+        fallback = state.get("context", {})
+        assert isinstance(fallback, Mapping)
+        return {"classification": {"label": "greeting"}}
+
+    contract = NodeContract(
+        name="classify_strict_read",
+        reads=("request.text",),
+        writes=("classification.label",),
+    )
+    wrapped = contract_node(classify, contract)
+
+    with pytest.raises(StateContractError) as error:
+        wrapped({"request": {"text": "hello"}, "context": {"fallback": "x"}})
+
+    assert error.value.access == "read"
+    assert error.value.undeclared_paths == ("context",)
+
+
+def test_contract_node_strict_mode_can_warn_for_undeclared_read(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    caplog.set_level(logging.WARNING, logger="graphobs.langgraph")
+
+    def classify(state: MappingState) -> MappingState:
+        state.get("context")
+        return {"classification": {"label": "greeting"}}
+
+    contract = NodeContract(
+        name="classify_strict_warn",
+        reads=("request.text",),
+        writes=("classification.label",),
+    )
+    wrapped = contract_node(
+        classify,
+        contract,
+        on_violation=ContractViolationAction.WARN,
+    )
+
+    result = wrapped({"request": {"text": "hello"}})
+
+    assert result == {"classification": {"label": "greeting"}}
+    assert caplog.messages == [
+        "Contract 'classify_strict_warn' read undeclared state paths: context"
     ]
 
 
@@ -799,3 +870,128 @@ class _RecordingGraph:
     def add_node(self, *args: object, **kwargs: object) -> object:
         self.calls.append({"args": args, "kwargs": kwargs})
         return self
+
+
+class ReducerChatState(TypedDict, total=False):
+    messages: Annotated[list[BaseMessage], add_messages]
+
+
+class AccumulatorState(TypedDict, total=False):
+    events: Annotated[list[str], operator.add]
+
+
+def _append_ai_turn(state: MappingState) -> MappingState:
+    return {"messages": [AIMessage(content="assistant turn")]}
+
+
+def _emit_event(state: AccumulatorState) -> AccumulatorState:
+    return {"events": ["from_inner"]}
+
+
+def test_contract_node_preserves_add_messages_reducer() -> None:
+    graph = StateGraph(ReducerChatState)
+    add_contract_node(
+        graph,
+        NodeContract(name="reply", reads=("messages",), writes=("messages",)),
+        _append_ai_turn,
+    )
+    graph.add_edge(START, "reply")
+    graph.add_edge("reply", END)
+
+    result = graph.compile().invoke({"messages": [HumanMessage(content="hello")]})
+
+    messages = result["messages"]
+    assert [type(message).__name__ for message in messages] == [
+        "HumanMessage",
+        "AIMessage",
+    ]
+    assert [message.content for message in messages] == ["hello", "assistant turn"]
+
+
+def test_contract_node_preserves_accumulating_reducer() -> None:
+    graph = StateGraph(AccumulatorState)
+    add_contract_node(
+        graph,
+        NodeContract(name="emit", reads=("events",), writes=("events",)),
+        _emit_event,
+    )
+    graph.add_edge(START, "emit")
+    graph.add_edge("emit", END)
+
+    result = graph.compile().invoke({"events": ["seed"]})
+
+    assert result["events"] == ["seed", "from_inner"]
+
+
+def test_contract_subgraph_preserves_last_value_wins_channel() -> None:
+    # Default (last-value-wins) channels are the supported subgraph case: the
+    # wrapper returns the projected value and the parent overwrites it once.
+    inner = StateGraph(ExampleState)
+    inner.add_node("produce", lambda state: {"answer": {"text": "from subgraph"}})
+    inner.add_edge(START, "produce")
+    inner.add_edge("produce", END)
+
+    subgraph = contract_subgraph(
+        inner.compile(),
+        SubgraphContract(
+            parent_input=("request.text",),
+            parent_output=("answer.text",),
+            owner_namespace="worker",
+        ),
+    )
+
+    result = subgraph({"request": {"text": "hello"}, "answer": {"text": "old"}})
+
+    assert result == {"answer": {"text": "from subgraph"}}
+
+
+def test_contract_subgraph_does_not_support_accumulating_reducers() -> None:
+    # Documented limitation: contract_subgraph cannot see the parent graph's
+    # channel reducers, so it returns the subgraph's full accumulated value.
+    # Under a non-deduplicating accumulating reducer the parent re-applies it,
+    # doubling the seeded input. Use a node-level contract for such channels.
+    inner = StateGraph(AccumulatorState)
+    inner.add_node("emit", _emit_event)
+    inner.add_edge(START, "emit")
+    inner.add_edge("emit", END)
+
+    parent = StateGraph(AccumulatorState)
+    parent.add_node(
+        "worker",
+        contract_subgraph(
+            inner.compile(),
+            SubgraphContract(
+                parent_input=("events",),
+                parent_output=("events",),
+                owner_namespace="worker",
+            ),
+        ),
+    )
+    parent.add_edge(START, "worker")
+    parent.add_edge("worker", END)
+
+    result = parent.compile().invoke({"events": ["seed"]})
+
+    # "seed" appears twice: once from the parent channel, once returned by the
+    # subgraph. This pins the documented limitation, not desired behavior.
+    assert result["events"] == ["seed", "seed", "from_inner"]
+
+
+def test_contract_node_empty_reads_grants_no_public_state() -> None:
+    # Omitting reads declares an empty boundary (not "all state"). A strict node
+    # that then reads state fails loudly instead of silently seeing nothing.
+    def classify(state: MappingState) -> MappingState:
+        state.get("request")
+        return {"classification": {"label": "greeting"}}
+
+    contract = NodeContract(
+        name="classify_no_reads",
+        writes=("classification.label",),
+    )
+    wrapped = contract_node(classify, contract)
+
+    with pytest.raises(StateContractError) as error:
+        wrapped({"request": {"text": "hello"}})
+
+    assert error.value.access == "read"
+    assert error.value.undeclared_paths == ("request",)

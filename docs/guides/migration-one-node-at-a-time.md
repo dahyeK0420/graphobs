@@ -197,6 +197,17 @@ patterns:
 Strict dotted write paths are best for stable public state. Broad namespace
 paths are often clearer for reducer-managed state that changes as one unit.
 
+Node wrappers are reducer-safe: `contract_node` returns the node's partial
+update unchanged, so a parent reducer such as `add_messages` or
+`Annotated[list, operator.add]` applies exactly once.
+
+`contract_subgraph` is different. It cannot see the parent graph's channel
+reducers, so it returns the subgraph's full projected value. That is correct
+for last-value-wins (overwrite) channels, but a non-deduplicating accumulating
+reducer re-applies the value and duplicates the seeded input. Keep accumulating
+channels on node-level contracts, or exclude them from `parent_output` and let
+the subgraph own them privately.
+
 ## Quick Check
 
 The first migrated node is complete when:

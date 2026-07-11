@@ -6,6 +6,25 @@ This project follows Semantic Versioning once public releases begin.
 
 ## Unreleased
 
+## 0.3.0 - 2026-07-11
+
+- Breaking: strict `contract_node` execution now enforces declared reads. A read
+  outside the contract raises `StateContractError` (or warns under
+  `on_violation=ContractViolationAction.WARN`) instead of silently resolving to
+  a projected default value. During migration, use `pass_through_state=True`
+  with `audit_reads=True` to surface undeclared reads without raising.
+- Add a `read`/`write` access kind to `StateContractError`; its message now
+  reads "read" or "wrote", and the `access` attribute records which occurred.
+- Document and test node reducer-safety: `contract_node` passes partial updates
+  through, so parent reducers such as `add_messages` and
+  `Annotated[list, operator.add]` apply exactly once.
+- Document a `contract_subgraph` reducer boundary: parent output supports
+  last-value-wins channels only; non-deduplicating accumulating reducers
+  double-apply the seeded input, so model those channels with node-level
+  contracts.
+- Clarify that omitting `reads` or `writes` declares an empty boundary, not
+  "all state".
+
 ## 0.2.1 - 2026-06-19
 
 - Add pre-commit hooks that run `make lint` and `make test` before each commit,
