@@ -73,6 +73,14 @@ def contract_subgraph(
     The subgraph receives only declared parent input plus declared private state
     keys. The wrapper returns only declared parent output changes.
 
+    Reducer safety: parent output paths must map to last-value-wins (overwrite)
+    channels. The wrapper cannot see the parent graph's channel reducers, so it
+    returns the subgraph's full projected value. Under a non-deduplicating
+    accumulating reducer (for example ``Annotated[list, operator.add]``) the
+    parent re-applies that value and duplicates the seeded input. Model
+    accumulating channels with a node-level ``contract_node`` instead, which
+    passes the node's partial update through unchanged.
+
     Args:
         compiled_graph: Compiled graph object with ``invoke``.
         contract: Subgraph parent boundary contract.

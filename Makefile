@@ -3,7 +3,9 @@
 # Thin wrappers around the `uv` commands documented in README.md, CONTRIBUTING.md,
 # and docs/. Run `make` or `make help` to list available targets.
 
-UV ?= uv
+UV ?= $(shell command -v uv 2>/dev/null || \
+  for p in /opt/homebrew/bin/uv $$HOME/.local/bin/uv /usr/local/bin/uv $$HOME/.cargo/bin/uv; do \
+    [ -x "$$p" ] && echo "$$p" && break; done)
 
 .DEFAULT_GOAL := help
 
