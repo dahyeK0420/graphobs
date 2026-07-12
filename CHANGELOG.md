@@ -4,6 +4,27 @@ All notable changes to this project will be documented in this file.
 
 This project follows Semantic Versioning once public releases begin.
 
+## 0.4.0 - 2026-07-12
+
+- Breaking: `ProjectionPolicy` is now include-only. The `exclude` and `summarize`
+  constructor axes are removed; they were unused outside tests, and span payloads
+  are already kept compact by the default trace serializer. Declare boundaries as
+  dotted include paths (a plain tuple, or `ProjectionPolicy(include=...)`).
+- Breaking: the redundant `ContractProjection` and `ProjectionPolicyLike`
+  protocols are removed from `graphobs.contracts.projection`, and the now-orphaned
+  `delete_path` is removed from `graphobs.state.paths`. The overlapping
+  contract/policy protocols are consolidated to `Contract` and `PathPolicy`.
+- Changed: contract drift is advisory by default. `assert_contract_matches` and
+  `assert_contract_amatches` log a warning and return the discovered draft; pass
+  `on_drift=ContractViolationAction.RAISE` (for example in a CI test) to raise
+  `ContractDriftError` as before.
+- Internal: the contract execution lifecycle is flattened. The `ContractRunSpec`
+  dataclass and the `node_contract_run_spec` / `subgraph_contract_run_spec`
+  factories are removed from `graphobs.langgraph.execution` in favor of a single
+  parameterized `instrument_contract_run` / `instrument_contract_arun` pair.
+- No change to the package-root interface, subgraph contracts, node contract
+  modes (`OBSERVE`/`AUDIT`/`ENFORCE`), or the discovery helpers.
+
 ## 0.3.1 - 2026-07-12
 
 - Consolidate contract conformance (undeclared-read/-write detection and

@@ -13,17 +13,18 @@ from graphobs.contracts.models import (
     ContractViolationAction,
     SubgraphContract,
 )
+from graphobs.contracts.projection import project_output
 from graphobs.langgraph.execution import (
+    build_execution_input,
     instrument_contract_arun,
     instrument_contract_run,
-    subgraph_contract_run_spec,
 )
 from graphobs.langgraph.nodes import (
     AsyncNodeFunction,
     NodeFunction,
     NodeWrapper,
 )
-from graphobs.state.paths import StateMapping, StateUpdate
+from graphobs.state.paths import StateMapping, StateUpdate, state_diff
 
 LOGGER = logging.getLogger("graphobs.langgraph")
 DEFAULT_SPAN_KIND = "CHAIN"
@@ -119,17 +120,23 @@ def _contract_sync_subgraph(
                 config=config,
             )
 
-        spec = subgraph_contract_run_spec(
+        return instrument_contract_run(
             contract,
+            state,
             span_kind=DEFAULT_SPAN_KIND,
             attributes={"graph.subgraph": contract.label},
+            execution_input=lambda raw_state: build_execution_input(
+                contract, raw_state
+            ),
+            execute=execute,
+            validation_update=state_diff,
+            public_output=lambda subgraph_input, after_state: project_output(
+                contract, subgraph_input, after_state
+            ),
+            return_value=None,
             on_violation=on_violation,
             logger=LOGGER,
-        )
-        return instrument_contract_run(
-            spec,
-            state,
-            execute=execute,
+            operation_name="Contract subgraph",
         )
 
     return wrapper
@@ -152,17 +159,23 @@ def _contract_async_subgraph(
                 config=config,
             )
 
-        spec = subgraph_contract_run_spec(
+        return await instrument_contract_arun(
             contract,
+            state,
             span_kind=DEFAULT_SPAN_KIND,
             attributes={"graph.subgraph": contract.label},
+            execution_input=lambda raw_state: build_execution_input(
+                contract, raw_state
+            ),
+            execute=execute,
+            validation_update=state_diff,
+            public_output=lambda subgraph_input, after_state: project_output(
+                contract, subgraph_input, after_state
+            ),
+            return_value=None,
             on_violation=on_violation,
             logger=LOGGER,
-        )
-        return await instrument_contract_arun(
-            spec,
-            state,
-            execute=execute,
+            operation_name="Contract subgraph",
         )
 
     return wrapper

@@ -15,11 +15,15 @@ from graphobs.contracts.models import (
     ContractViolationAction,
     NodeContract,
 )
+from graphobs.contracts.projection import (
+    STRICT_OBSERVATION,
+    observe_payload,
+)
 from graphobs.langgraph.execution import (
+    UpdateBuilder,
     build_execution_input,
     instrument_contract_arun,
     instrument_contract_run,
-    node_contract_run_spec,
 )
 from graphobs.langgraph.read_audit import (
     enforce_undeclared_reads,
@@ -205,8 +209,9 @@ def _wrap_contract_node(
                 enforce_undeclared_reads(contract, tracker, on_violation=read_violation)
                 return update
 
-            spec = node_contract_run_spec(
+            return await instrument_contract_arun(
                 contract,
+                state,
                 span_kind=contract.span_kind or DEFAULT_SPAN_KIND,
                 attributes=_node_attributes(contract),
                 execution_input=lambda raw_state: _node_execution_input(
@@ -215,13 +220,13 @@ def _wrap_contract_node(
                     pass_through_state=execution.pass_through_state,
                     tracker=tracker,
                 ),
+                execute=execute,
+                validation_update=_node_update_passthrough,
+                public_output=_node_public_output(contract),
+                return_value=_node_update_passthrough,
                 on_violation=execution.on_violation,
                 logger=LOGGER,
-            )
-            return await instrument_contract_arun(
-                spec,
-                state,
-                execute=execute,
+                operation_name="Contract node",
             )
 
         return async_wrapper
@@ -237,8 +242,9 @@ def _wrap_contract_node(
             enforce_undeclared_reads(contract, tracker, on_violation=read_violation)
             return update
 
-        spec = node_contract_run_spec(
+        return instrument_contract_run(
             contract,
+            state,
             span_kind=contract.span_kind or DEFAULT_SPAN_KIND,
             attributes=_node_attributes(contract),
             execution_input=lambda raw_state: _node_execution_input(
@@ -247,13 +253,13 @@ def _wrap_contract_node(
                 pass_through_state=execution.pass_through_state,
                 tracker=tracker,
             ),
+            execute=execute,
+            validation_update=_node_update_passthrough,
+            public_output=_node_public_output(contract),
+            return_value=_node_update_passthrough,
             on_violation=execution.on_violation,
             logger=LOGGER,
-        )
-        return instrument_contract_run(
-            spec,
-            state,
-            execute=execute,
+            operation_name="Contract node",
         )
 
     return sync_wrapper
@@ -350,6 +356,24 @@ def _node_attributes(contract: NodeContract) -> Mapping[str, object]:
     attributes: dict[str, object] = {"graph.node": contract.label}
     attributes.update(contract.attributes)
     return attributes
+
+
+def _node_update_passthrough(
+    _run_input: StateMapping, update: StateMapping
+) -> StateUpdate:
+    """Node validation update and return value: the raw node update, unchanged."""
+    return update
+
+
+def _node_public_output(contract: NodeContract) -> UpdateBuilder:
+    """Builds the node's projected public output span payload."""
+
+    def build(_run_input: StateMapping, update: StateMapping) -> dict[str, object]:
+        return observe_payload(
+            contract, update, "output", observation=STRICT_OBSERVATION
+        )
+
+    return build
 
 
 def _node_execution_input(

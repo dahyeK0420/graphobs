@@ -197,8 +197,8 @@ patterns:
   not projected publicly.
 - Start with `mode=NodeContractMode.AUDIT` while confirming which reducer
   marker keys appear in real updates.
-- Use `ProjectionPolicy(..., summarize=(...))` for heavy namespace paths where
-  shape is useful but full values are noisy.
+- Heavy namespace values are kept compact automatically by the default trace
+  serializer, so declaring the namespace broadly is enough.
 
 Strict dotted write paths are best for stable public state. Broad namespace
 paths are often clearer for reducer-managed state that changes as one unit.
@@ -217,11 +217,14 @@ the subgraph own them privately.
 ## Guard Against Contract Drift
 
 Once a node has a contract, keep them from drifting apart. `assert_contract_matches`
-runs the node against synthetic samples and fails if the node reads or writes a
-path the contract does not declare. Use it as a unit test or CI check so drift
-surfaces as a failed assertion instead of a surprise at runtime:
+runs the node against synthetic samples and, by default, logs a warning when the
+node reads or writes a path the contract does not declare, returning the
+discovered draft so you can inspect it. Pass
+`on_drift=ContractViolationAction.RAISE` in a unit test or CI check to turn drift
+into a raised `ContractDriftError` instead of a surprise at runtime:
 
 ```python
+from graphobs.contracts.models import ContractViolationAction
 from graphobs.discovery.drift import assert_contract_matches
 
 def test_classify_stays_within_contract() -> None:
@@ -229,6 +232,7 @@ def test_classify_stays_within_contract() -> None:
         classify,
         classify_contract,
         [{"request": {"text": "hello"}}],
+        on_drift=ContractViolationAction.RAISE,
     )
 ```
 

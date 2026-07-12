@@ -21,16 +21,10 @@ from opentelemetry.sdk.trace.export.in_memory_span_exporter import (
 )
 
 from graphobs.contracts.models import (
-    ContractViolationAction,
     NodeContract,
     ProjectionPolicy,
     StateContractError,
     SubgraphContract,
-)
-from graphobs.langgraph.execution import (
-    instrument_contract_run,
-    node_contract_run_spec,
-    subgraph_contract_run_spec,
 )
 from graphobs.langgraph.nodes import (
     NodeContractMode,
@@ -454,7 +448,7 @@ def test_contract_node_decorator_wraps_async_node(
     assert span.name == "decorated_async_classify"
 
 
-def test_node_contract_run_spec_returns_update_and_projects_span_output(
+def test_contract_node_returns_raw_update_and_projects_span_output(
     span_exporter: InMemorySpanExporter,
 ) -> None:
     contract = NodeContract(
@@ -463,23 +457,12 @@ def test_node_contract_run_spec_returns_update_and_projects_span_output(
         writes=("classification.label",),
         private_writes=("scratch.step",),
     )
-    spec = node_contract_run_spec(
-        contract,
-        span_kind="CHAIN",
-        attributes={"graph.node": contract.label},
-        execution_input=lambda state: {"request": state["request"]},
-        on_violation=ContractViolationAction.RAISE,
-        logger=logging.getLogger("graphobs.langgraph"),
-    )
 
-    result = instrument_contract_run(
-        spec,
-        {"request": {"text": "hello", "raw": "hidden"}},
-        execute=lambda _run_input: {
-            "classification": {"label": "greeting"},
-            "scratch": {"step": 1},
-        },
-    )
+    def classify(_state: MappingState) -> MappingState:
+        return {"classification": {"label": "greeting"}, "scratch": {"step": 1}}
+
+    wrapped = contract_node(classify, contract)
+    result = wrapped({"request": {"text": "hello", "raw": "hidden"}})
 
     assert result == {"classification": {"label": "greeting"}, "scratch": {"step": 1}}
     span = span_exporter.get_finished_spans()[0]
@@ -491,7 +474,7 @@ def test_node_contract_run_spec_returns_update_and_projects_span_output(
     }
 
 
-def test_subgraph_contract_run_spec_returns_projected_parent_output(
+def test_contract_subgraph_returns_projected_parent_output(
     span_exporter: InMemorySpanExporter,
 ) -> None:
     contract = SubgraphContract(
@@ -500,22 +483,18 @@ def test_subgraph_contract_run_spec_returns_projected_parent_output(
         private_state_keys=("scratch",),
         owner_namespace="spec_answer_subgraph",
     )
-    spec = subgraph_contract_run_spec(
-        contract,
-        span_kind="CHAIN",
-        attributes={"graph.subgraph": contract.label},
-        on_violation=ContractViolationAction.RAISE,
-        logger=logging.getLogger("graphobs.langgraph"),
-    )
 
-    result = instrument_contract_run(
-        spec,
-        {"request": {"text": "hello", "raw": "hidden"}, "scratch": {"step": 1}},
-        execute=lambda _run_input: {
-            "request": {"text": "hello"},
-            "answer": {"text": "done"},
-            "scratch": {"step": 2},
-        },
+    class _Subgraph:
+        def invoke(self, _input: MappingState) -> MappingState:
+            return {
+                "request": {"text": "hello"},
+                "answer": {"text": "done"},
+                "scratch": {"step": 2},
+            }
+
+    wrapped = contract_subgraph(cast(InvokableGraph, _Subgraph()), contract)
+    result = wrapped(
+        {"request": {"text": "hello", "raw": "hidden"}, "scratch": {"step": 1}}
     )
 
     assert result == {"answer": {"text": "done"}}

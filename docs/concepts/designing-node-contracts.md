@@ -52,31 +52,11 @@ Declare only the state paths the node needs to make its decision.
 reads=("request.text", "retrieval.documents")
 ```
 
-If a node receives the whole graph state today, the contract can still project a
-smaller execution input before the node runs.
-
-Use `ProjectionPolicy` when the public boundary needs include, exclude, or
-summary rules instead of a plain tuple of dotted paths.
-
-```python
-from graphobs import NodeContract
-from graphobs.contracts.models import ProjectionPolicy
-
-contract = NodeContract(
-    name="retrieve",
-    reads=ProjectionPolicy(
-        include=("request", "retrieval.documents"),
-        exclude=("request.raw",),
-        summarize=("retrieval.documents",),
-    ),
-    writes=("answer.sources",),
-)
-```
-
-`include` selects public paths first. `exclude` then removes nested paths such as
-large raw request bodies. `summarize` replaces selected values with compact
-metadata from `shape_summary`, which is useful for lists, blobs, or other values
-where shape is enough for observability.
+If a node receives the whole graph state today, the contract still projects a
+smaller execution input before the node runs, so its span records only the
+declared reads. Declared paths are dotted include paths; span payloads are then
+kept compact by the default trace serializer (see
+[Payload Safety And Redaction](payload-safety-redaction.md)).
 
 ## Choose Writes
 
@@ -84,16 +64,6 @@ Declare the state paths the node is allowed to return.
 
 ```python
 writes=("answer.text", "answer.confidence")
-```
-
-For heavy output paths, `writes` can also accept `ProjectionPolicy` so traces
-keep shape without storing full values:
-
-```python
-writes=ProjectionPolicy(
-    include=("answer.text", "tool_results"),
-    summarize=("tool_results",),
-)
 ```
 
 `validate_update` raises `StateContractError` when a node returns an undeclared

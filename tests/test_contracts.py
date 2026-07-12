@@ -236,35 +236,25 @@ def test_validate_update_can_warn_and_continue(
     assert caplog.messages == [str(expected_error)]
 
 
-def test_projection_policy_excludes_and_summarizes_nested_state() -> None:
-    policy = ProjectionPolicy(
-        include=("request", "documents", "blob", "optional"),
-        exclude=("request.raw",),
-        summarize=("documents", "blob", "optional"),
-    )
+def test_projection_policy_projects_included_nested_paths() -> None:
+    policy = ProjectionPolicy(include=("request.text", "documents"))
     state = {
         "request": {"text": "find notes", "raw": "large raw payload"},
-        "documents": [
-            {"title": "A"},
-            {"title": "B"},
-        ],
-        "blob": b"large bytes",
-        "optional": None,
+        "documents": [{"title": "A"}, {"title": "B"}],
         "scratch": {"ignored": True},
     }
 
     assert policy.project(state) == {
         "request": {"text": "find notes"},
-        "documents": {"type": "sequence", "size": 2},
-        "blob": {"type": "bytes", "length": 11},
-        "optional": {"type": "none"},
+        "documents": [{"title": "A"}, {"title": "B"}],
     }
 
 
-def test_projection_policy_can_project_all_except_excluded_paths() -> None:
-    policy = ProjectionPolicy(exclude=("scratch",))
-
-    assert policy.project({"public": "yes", "scratch": "hidden"}) == {"public": "yes"}
+def test_projection_policy_includes_all_state_when_include_omitted() -> None:
+    assert ProjectionPolicy().project({"public": "yes", "scratch": "kept"}) == {
+        "public": "yes",
+        "scratch": "kept",
+    }
 
 
 def test_subgraph_public_projection_excludes_private_state() -> None:

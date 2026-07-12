@@ -9,13 +9,8 @@ from graphobs.state.observed_access import (
 
 
 class _Policy:
-    def __init__(
-        self,
-        include: tuple[str, ...] | None,
-        exclude: tuple[str, ...] = (),
-    ) -> None:
+    def __init__(self, include: tuple[str, ...] | None) -> None:
         self.include = include
-        self.exclude = exclude
 
 
 def test_observed_paths_select_most_specific_reads_in_order() -> None:
@@ -79,18 +74,12 @@ def test_observed_paths_classify_undeclared_reads_in_observed_order() -> None:
     ) == ("context.extra", "debug")
 
 
-def test_observed_read_policy_allows_overlapping_paths_and_excludes_overlap() -> None:
+def test_observed_read_policy_allows_overlapping_paths() -> None:
     policy = _Policy(include=("request.text",))
-    excluding_policy = _Policy(include=("request.text",), exclude=("request.raw",))
 
     assert policy_allows_observed_read_path(("request",), policy)
     assert policy_allows_observed_read_path(("request", "text", "normalized"), policy)
-    assert not policy_allows_observed_read_path(("request",), excluding_policy)
-    assert not policy_allows_observed_read_path(("request", "raw"), excluding_policy)
-    assert not policy_allows_observed_read_path(
-        ("request", "raw", "value"),
-        excluding_policy,
-    )
+    assert not policy_allows_observed_read_path(("context",), policy)
 
 
 def test_policy_allows_write_paths_only_under_declared_paths() -> None:
@@ -99,14 +88,6 @@ def test_policy_allows_write_paths_only_under_declared_paths() -> None:
     assert policy_allows_write_path(("answer", "text"), policy)
     assert policy_allows_write_path(("answer",), policy)
     assert not policy_allows_write_path(("metrics",), policy)
-
-
-def test_policy_allows_write_path_excludes_overlapping_paths() -> None:
-    policy = _Policy(include=None, exclude=("request.raw",))
-
-    assert policy_allows_write_path(("request", "text"), policy)
-    assert not policy_allows_write_path(("request",), policy)
-    assert not policy_allows_write_path(("request", "raw"), policy)
 
 
 def test_paths_overlap_matches_ancestors_and_descendants() -> None:

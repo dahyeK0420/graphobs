@@ -149,7 +149,7 @@ telemetry exporters, or validation frameworks. It provides:
 
 - `NodeContract` for public and private node state boundaries.
 - `SubgraphContract` for parent/subgraph state boundaries.
-- `ProjectionPolicy` for dotted-path include, exclude, and summary rules.
+- `ProjectionPolicy` for dotted-path include rules.
 - Validation helpers that reject undeclared writes without storing state values
   in error objects.
 - Experimental discovery helpers that draft node contracts from synthetic

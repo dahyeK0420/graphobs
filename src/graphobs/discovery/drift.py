@@ -9,7 +9,7 @@ from graphobs.contracts.conformance import (
     undeclared_read_paths,
     undeclared_write_paths,
 )
-from graphobs.contracts.models import NodeContract
+from graphobs.contracts.models import ContractViolationAction, NodeContract
 from graphobs.discovery.draft import DiscoveredContract
 from graphobs.discovery.runner import (
     AsyncDiscoveryNode,
@@ -71,24 +71,30 @@ def assert_contract_matches(
     samples: Iterable[StateMapping],
     *,
     node_kwargs: Mapping[str, object] | None = None,
+    on_drift: ContractViolationAction = ContractViolationAction.WARN,
 ) -> DiscoveredContract:
-    """Fails if a node's sample reads or writes fall outside its contract.
+    """Checks whether a node's sample reads or writes stay within its contract.
 
     Runs the raw node against synthetic samples, then compares the observed
-    reads and writes with the contract's read and write policies. Intended as a
-    test or CI guard that turns silent contract drift into a failed assertion.
+    reads and writes with the contract's read and write policies. Drift is
+    advisory by default: it is logged as a warning and the discovered draft is
+    still returned. Pass ``on_drift=ContractViolationAction.RAISE`` (for example
+    in a CI test) to turn drift into a raised ``ContractDriftError`` instead.
 
     Args:
         node: Synchronous node callable that accepts a state mapping.
-        contract: Declared node contract the samples must stay within.
+        contract: Declared node contract the samples are compared against.
         samples: Synthetic sample states to execute sequentially.
         node_kwargs: Optional keyword arguments forwarded to every sample run.
+        on_drift: Whether undeclared sample reads or writes log a warning
+            (default) or raise ``ContractDriftError``.
 
     Returns:
         The draft contract discovered from the samples, for inspection.
 
     Raises:
-        ContractDriftError: If any sample read or write is undeclared.
+        ContractDriftError: If any sample read or write is undeclared and
+            ``on_drift`` is ``ContractViolationAction.RAISE``.
         ContractDiscoveryError: If any sample execution fails.
     """
     discovered = discover_contract(
@@ -97,7 +103,7 @@ def assert_contract_matches(
         name=contract.name,
         node_kwargs=node_kwargs,
     )
-    _raise_on_drift(contract, discovered)
+    _report_drift(contract, discovered, on_drift=on_drift)
     return discovered
 
 
@@ -107,22 +113,28 @@ async def assert_contract_amatches(
     samples: Iterable[StateMapping],
     *,
     node_kwargs: Mapping[str, object] | None = None,
+    on_drift: ContractViolationAction = ContractViolationAction.WARN,
 ) -> DiscoveredContract:
-    """Fails if an async node's sample reads or writes fall outside its contract.
+    """Checks whether an async node's sample reads or writes stay within contract.
 
-    Asynchronous counterpart to ``assert_contract_matches``.
+    Asynchronous counterpart to ``assert_contract_matches``. Drift is advisory
+    by default (logged as a warning); pass
+    ``on_drift=ContractViolationAction.RAISE`` to raise ``ContractDriftError``.
 
     Args:
         node: Asynchronous node callable that accepts a state mapping.
-        contract: Declared node contract the samples must stay within.
+        contract: Declared node contract the samples are compared against.
         samples: Synthetic sample states to execute sequentially.
         node_kwargs: Optional keyword arguments forwarded to every sample run.
+        on_drift: Whether undeclared sample reads or writes log a warning
+            (default) or raise ``ContractDriftError``.
 
     Returns:
         The draft contract discovered from the samples, for inspection.
 
     Raises:
-        ContractDriftError: If any sample read or write is undeclared.
+        ContractDriftError: If any sample read or write is undeclared and
+            ``on_drift`` is ``ContractViolationAction.RAISE``.
         ContractDiscoveryError: If any sample execution fails.
     """
     discovered = await adiscover_contract(
@@ -131,13 +143,15 @@ async def assert_contract_amatches(
         name=contract.name,
         node_kwargs=node_kwargs,
     )
-    _raise_on_drift(contract, discovered)
+    _report_drift(contract, discovered, on_drift=on_drift)
     return discovered
 
 
-def _raise_on_drift(
+def _report_drift(
     contract: NodeContract,
     discovered: DiscoveredContract,
+    *,
+    on_drift: ContractViolationAction,
 ) -> None:
     undeclared_reads = undeclared_read_paths(contract, discovered.reads)
     undeclared_writes = undeclared_write_paths(
@@ -147,6 +161,9 @@ def _raise_on_drift(
     if not undeclared_reads and not undeclared_writes:
         return
     error = ContractDriftError(contract.name, undeclared_reads, undeclared_writes)
+    if on_drift == ContractViolationAction.WARN:
+        LOGGER.warning("%s", error)
+        return
     LOGGER.error("%s", error)
     raise error
 

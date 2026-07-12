@@ -6,7 +6,7 @@ from collections.abc import Mapping
 
 import pytest
 
-from graphobs.contracts.models import NodeContract
+from graphobs.contracts.models import ContractViolationAction, NodeContract
 from graphobs.discovery.draft import DiscoveredContract
 from graphobs.discovery.drift import (
     ContractDriftError,
@@ -228,6 +228,7 @@ def test_assert_contract_matches_detects_undeclared_read() -> None:
             classify,
             contract,
             [{"request": {"text": "hi"}, "secret": "token"}],
+            on_drift=ContractViolationAction.RAISE,
         )
 
     assert error.value.node_name == "classify"
@@ -254,6 +255,7 @@ def test_assert_contract_matches_detects_undeclared_write() -> None:
             classify,
             contract,
             [{"request": {"text": "hi"}}],
+            on_drift=ContractViolationAction.RAISE,
         )
 
     assert error.value.undeclared_reads == ()
@@ -278,6 +280,7 @@ def test_assert_contract_amatches_detects_drift() -> None:
                 answer,
                 contract,
                 [{"request": {"text": "hi"}}],
+                on_drift=ContractViolationAction.RAISE,
             )
         )
 
@@ -300,9 +303,65 @@ def test_contract_drift_error_reports_paths_without_sampled_values(
             classify,
             contract,
             [{"request": {"text": "secret-value"}}],
+            on_drift=ContractViolationAction.RAISE,
         )
 
     assert error.value.undeclared_writes == ("leak",)
     assert "secret-value" not in str(error.value)
     assert "secret-value" not in caplog.text
     assert caplog.records[0].levelno == logging.ERROR
+
+
+def test_assert_contract_matches_warns_by_default(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    caplog.set_level(logging.WARNING, logger="graphobs.discovery")
+
+    def classify(state: Mapping[str, object]) -> Mapping[str, object]:
+        request = state["request"]
+        return {"classification": {"label": str(request)}, "debug": {"trace": "x"}}
+
+    contract = NodeContract(
+        name="classify",
+        reads=("request",),
+        writes=("classification.label",),
+    )
+
+    draft = assert_contract_matches(
+        classify,
+        contract,
+        [{"request": {"text": "hi"}}],
+    )
+
+    assert draft.writes == ("classification.label", "debug.trace")
+    assert [record.levelno for record in caplog.records] == [logging.WARNING]
+    assert "debug.trace" in caplog.text
+
+
+def test_assert_contract_amatches_warns_by_default(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    caplog.set_level(logging.WARNING, logger="graphobs.discovery")
+
+    async def answer(state: Mapping[str, object]) -> Mapping[str, object]:
+        await asyncio.sleep(0)
+        request = state["request"]
+        return {"answer": {"text": str(request)}, "scratch": {"note": "x"}}
+
+    contract = NodeContract(
+        name="answer",
+        reads=("request",),
+        writes=("answer.text",),
+    )
+
+    draft = asyncio.run(
+        assert_contract_amatches(
+            answer,
+            contract,
+            [{"request": {"text": "hi"}}],
+        )
+    )
+
+    assert draft.writes == ("answer.text", "scratch.note")
+    assert [record.levelno for record in caplog.records] == [logging.WARNING]
+    assert "scratch.note" in caplog.text

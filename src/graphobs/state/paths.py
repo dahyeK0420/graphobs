@@ -66,24 +66,6 @@ def set_path(target: MutableMapping[str, object], path: Path, value: object) -> 
     current[path[-1]] = value
 
 
-def delete_path(target: MutableMapping[str, object], path: Path) -> bool:
-    """Deletes a nested path and prunes empty parent mappings."""
-    if len(path) == 1:
-        if path[0] not in target:
-            return False
-        del target[path[0]]
-        return True
-
-    child = target.get(path[0])
-    if not isinstance(child, MutableMapping):
-        return False
-
-    deleted = delete_path(cast(MutableMapping[str, object], child), path[1:])
-    if deleted and not child:
-        target.pop(path[0], None)
-    return deleted
-
-
 class _Missing:
     pass
 
@@ -138,7 +120,6 @@ __all__ = [
     "Path",
     "StateMapping",
     "StateUpdate",
-    "delete_path",
     "get_path",
     "is_prefix",
     "iter_update_paths",
