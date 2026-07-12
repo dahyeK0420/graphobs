@@ -32,13 +32,15 @@ the wrapper should use.
 ## 3. Choose The First Integration Mode
 
 For existing graphs, start with the least invasive mode that answers your
-current question:
+current question. `contract_node` and `add_contract_node` take a single
+`mode` from `NodeContractMode`:
 
 | Goal | Start here | Execution changes? |
 | --- | --- | --- |
 | Cleaner callback payloads only | `project_callback_payloads` | No |
-| Contract warnings without behavior changes | `contract_node(..., pass_through_state=True, audit_reads=True)` | No input filtering |
-| Strict contract-shaped execution | default `contract_node` | Yes |
+| Cleaner spans, no execution change | `contract_node(..., mode=NodeContractMode.OBSERVE)` | No |
+| Read and write warnings during migration | `contract_node(..., mode=NodeContractMode.AUDIT)` | No input filtering |
+| Strict contract-shaped execution | `contract_node(...)` (default `ENFORCE`) | Yes |
 
 ### Callback Projection Only
 
@@ -63,31 +65,29 @@ The wrapper matches LangGraph node events by `metadata["langgraph_node"]`.
 Set `diagnostics=True` during migration and inspect `projection_stats()` when
 subgraphs or custom node names might change the metadata value.
 
-### Pass-Through Execution With Audits
+### Observe Or Audit Execution
 
-Use pass-through mode when an existing node may read fallback keys or
+Use `OBSERVE` or `AUDIT` when an existing node may read fallback keys or
 namespace-managed state that is not fully declared yet:
 
 ```python
-from graphobs import contract_node
-from graphobs.contracts.models import ContractViolationAction
+from graphobs import NodeContractMode, contract_node
 
 graph.add_node(
     "classify",
     contract_node(
         classify,
         classify_contract,
-        pass_through_state=True,
-        audit_reads=True,
-        on_violation=ContractViolationAction.WARN,
+        mode=NodeContractMode.AUDIT,
     ),
 )
 ```
 
-The node receives the original state, while span input and output stay
-contract-projected. `audit_reads=True` logs undeclared read paths without
-logging state values. `on_violation=ContractViolationAction.WARN` logs
-undeclared writes while you are still refining the contract.
+In both modes the node receives the original state, while span input and output
+stay contract-projected, and undeclared writes are logged as warnings and still
+forwarded. `AUDIT` additionally logs undeclared read paths (without logging
+state values); `OBSERVE` leaves reads unaudited when you only want cleaner
+spans.
 
 ### Strict Projected Execution
 
@@ -125,25 +125,31 @@ add_contract_node(graph, classify_contract, classify)
 ```
 
 Use this form when the graph node name should come directly from the contract.
+The default `mode` is `NodeContractMode.ENFORCE`, so both forms above enforce
+the contract unless you pass `OBSERVE` or `AUDIT`.
 
-During early adoption, you can log undeclared writes and continue instead of
-raising immediately:
+During early adoption, use `OBSERVE` or `AUDIT` to log undeclared writes and
+continue instead of raising immediately. Warning modes log the same
+`StateContractError` message that `ENFORCE` would raise.
+
+### Adopt Several Nodes At Once
+
+`add_contract_nodes` registers many nodes with one call and one shared mode,
+which suits instrumenting a whole graph in `OBSERVE` before promoting
+individual nodes to `ENFORCE`:
 
 ```python
-from graphobs.contracts.models import ContractViolationAction
+from graphobs import NodeContractMode, add_contract_nodes
 
-graph.add_node(
-    "classify",
-    contract_node(
-        classify,
-        classify_contract,
-        on_violation=ContractViolationAction.WARN,
-    ),
+add_contract_nodes(
+    graph,
+    [
+        (classify_contract, classify),
+        (answer_contract, answer),
+    ],
+    mode=NodeContractMode.OBSERVE,
 )
 ```
-
-Warning mode logs the same `StateContractError` message that raise mode would
-emit. The default remains `ContractViolationAction.RAISE`.
 
 ## 4. Run The Graph
 
@@ -189,8 +195,8 @@ patterns:
   nested marker keys are implementation details of the reducer.
 - Use `private_writes` for local namespace state that should be validated but
   not projected publicly.
-- Start with `on_violation=ContractViolationAction.WARN` while confirming which
-  reducer marker keys appear in real updates.
+- Start with `mode=NodeContractMode.AUDIT` while confirming which reducer
+  marker keys appear in real updates.
 - Use `ProjectionPolicy(..., summarize=(...))` for heavy namespace paths where
   shape is useful but full values are noisy.
 
@@ -208,12 +214,33 @@ reducer re-applies the value and duplicates the seeded input. Keep accumulating
 channels on node-level contracts, or exclude them from `parent_output` and let
 the subgraph own them privately.
 
+## Guard Against Contract Drift
+
+Once a node has a contract, keep them from drifting apart. `assert_contract_matches`
+runs the node against synthetic samples and fails if the node reads or writes a
+path the contract does not declare. Use it as a unit test or CI check so drift
+surfaces as a failed assertion instead of a surprise at runtime:
+
+```python
+from graphobs.discovery.drift import assert_contract_matches
+
+def test_classify_stays_within_contract() -> None:
+    assert_contract_matches(
+        classify,
+        classify_contract,
+        [{"request": {"text": "hello"}}],
+    )
+```
+
+Discovery is sample-dependent, so cover the branches you care about. Use
+`assert_contract_amatches` for async nodes.
+
 ## Quick Check
 
 The first migrated node is complete when:
 
-- Callback projection or pass-through mode preserves existing graph behavior.
-- Strict mode nodes receive only declared reads and private reads.
+- Callback projection, observe, or audit mode preserves existing graph behavior.
+- Enforce mode nodes receive only declared reads and private reads.
 - The node returns only declared writes and private writes.
 - Compact span input and output are useful without full state dumps.
 - Existing graph behavior still passes its tests.

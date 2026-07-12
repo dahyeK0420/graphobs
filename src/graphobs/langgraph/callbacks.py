@@ -7,11 +7,8 @@ from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import TypeAlias
 
-from graphobs._observability.payload_policy import (
-    PayloadKind,
-    project_contract_payload,
-)
 from graphobs.contracts.models import Contract
+from graphobs.contracts.projection import COMPACT_OBSERVATION, observe_payload
 
 LOGGER = logging.getLogger("graphobs.langgraph.callbacks")
 LANGGRAPH_NODE_METADATA_KEY = "langgraph_node"
@@ -197,10 +194,11 @@ class ProjectedCallbackHandler:
                 self._contracts_by_run_id[_run_key(run_id)] = _MatchedContract(
                     contract,
                 )
-                projected_inputs = _project_or_summarize(
+                projected_inputs = observe_payload(
                     contract,
                     inputs,
-                    payload_kind="input",
+                    "input",
+                    observation=COMPACT_OBSERVATION,
                 )
             else:
                 self._miss_node(node_name)
@@ -229,10 +227,11 @@ class ProjectedCallbackHandler:
         matched_contract = self._contracts_by_run_id.pop(_run_key(run_id), None)
         projected_outputs: Mapping[str, object] = outputs
         if matched_contract is not None:
-            projected_outputs = _project_or_summarize(
+            projected_outputs = observe_payload(
                 matched_contract.contract,
                 outputs,
-                payload_kind="output",
+                "output",
+                observation=COMPACT_OBSERVATION,
             )
 
         _call_callback_method(
@@ -302,26 +301,6 @@ def _langgraph_node(metadata: Metadata | None) -> str | None:
     if node_name is None:
         return None
     return str(node_name)
-
-
-def _project_or_summarize(
-    contract: Contract,
-    payload: Mapping[str, object],
-    *,
-    payload_kind: PayloadKind,
-) -> Mapping[str, object]:
-    policy = (
-        contract.input_policy if payload_kind == "input" else contract.output_policy
-    )
-    return project_contract_payload(
-        contract_label=contract.label,
-        payload=payload,
-        payload_kind=payload_kind,
-        project=policy.project,
-        logger=LOGGER,
-        fallback_to_summary=True,
-        compact_projected=True,
-    )
 
 
 def _call_callback_method(

@@ -4,10 +4,11 @@
 
 graphobs helps teams describe graph state boundaries once, then reuse those declarations for trace payloads, structured logs, and validation.
 
-The `0.3.0` release hardens strict node execution: contract reads are now
-enforced, and reducer-channel behavior is documented and tested. It builds on
-the core contract model, LangGraph integration helpers, callback payload
-projection, backend-portable tracing helpers, and structured logging helpers.
+The `0.3.1` release consolidates internal contract-enforcement and
+payload-projection code into single homes, with no change to the package-root
+interface. It builds on the core contract model, LangGraph integration helpers,
+callback payload projection, backend-portable tracing helpers, and structured
+logging helpers.
 
 ## Why This Exists
 
@@ -123,15 +124,16 @@ public_input = project_input(contract, state)
 
 The contract model is plain Python and has no graph runtime dependency.
 
-For an existing LangGraph app, choose the adoption path by risk:
+For an existing LangGraph app, choose the adoption path by risk. `contract_node`
+takes one `mode` from `NodeContractMode`:
 
 - Want cleaner callback payloads without changing execution? Start with
   `project_callback_payloads`.
-- Want enforcement while preserving current node behavior? Use
-  `contract_node(..., pass_through_state=True, audit_reads=True,
-  on_violation=ContractViolationAction.WARN)`.
+- Want cleaner spans and read/write warnings while preserving current node
+  behavior? Use `contract_node(..., mode=NodeContractMode.OBSERVE)` or
+  `NodeContractMode.AUDIT`.
 - Want strict contract-shaped execution for a stable node? Use the default
-  `contract_node` wrapper.
+  `contract_node` wrapper (`NodeContractMode.ENFORCE`).
 
 Callback projection is the lowest-risk migration path because the node still
 receives the graph state LangGraph would normally provide:
@@ -164,11 +166,11 @@ def classify(state):
 ```
 
 For migration guardrails without execution filtering, wrap at registration time
-with pass-through execution and read auditing:
+in `AUDIT` mode, which keeps the node on the full graph state and logs
+undeclared reads and writes:
 
 ```python
-from graphobs import NodeContract, contract_node
-from graphobs.contracts.models import ContractViolationAction
+from graphobs import NodeContract, NodeContractMode, contract_node
 
 classify_contract = NodeContract(
     name="classify",
@@ -181,10 +183,21 @@ graph.add_node(
     contract_node(
         classify,
         classify_contract,
-        pass_through_state=True,
-        audit_reads=True,
-        on_violation=ContractViolationAction.WARN,
+        mode=NodeContractMode.AUDIT,
     ),
+)
+```
+
+To instrument a whole graph in one step, register every node at once and
+promote nodes to `ENFORCE` individually as their boundaries stabilize:
+
+```python
+from graphobs import NodeContractMode, add_contract_nodes
+
+add_contract_nodes(
+    graph,
+    [(classify_contract, classify), (answer_contract, answer)],
+    mode=NodeContractMode.OBSERVE,
 )
 ```
 
@@ -239,7 +252,7 @@ See [docs/concepts/public-neutrality.md](https://github.com/dahyeK0420/graphobs/
 - [Backend Portability With OTel And OpenInference](https://github.com/dahyeK0420/graphobs/blob/main/docs/concepts/backend-portability.md)
 - [Migrate One Node At A Time](https://github.com/dahyeK0420/graphobs/blob/main/docs/guides/migration-one-node-at-a-time.md)
 - [Medium Companion](https://github.com/dahyeK0420/graphobs/blob/main/docs/articles/medium-companion.md)
-- [0.3.0 Release Notes](https://github.com/dahyeK0420/graphobs/blob/main/docs/releases/v0.3.0.md)
+- [0.3.1 Release Notes](https://github.com/dahyeK0420/graphobs/blob/main/docs/releases/v0.3.1.md)
 - [Contracts API Reference](https://github.com/dahyeK0420/graphobs/blob/main/docs/reference/contracts.md)
 - [LangGraph API Reference](https://github.com/dahyeK0420/graphobs/blob/main/docs/reference/langgraph.md)
 - [Logging API Reference](https://github.com/dahyeK0420/graphobs/blob/main/docs/reference/logging.md)

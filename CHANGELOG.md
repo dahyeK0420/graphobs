@@ -4,6 +4,23 @@ All notable changes to this project will be documented in this file.
 
 This project follows Semantic Versioning once public releases begin.
 
+## 0.3.1 - 2026-07-12
+
+- Consolidate contract conformance (undeclared-read/-write detection and
+  violation reporting) into `contracts/conformance.py`; runtime write
+  validation, runtime read enforcement, and sample drift checks now share one
+  implementation instead of re-deriving the same rules.
+- Fold the duplicated `state/policies.py` into `state/observed_access.py`:
+  `policy_allows_write_path` moves beside the read check under one `PathPolicy`
+  shape, removing byte-identical helper copies. `graphobs.state.policies` is
+  removed.
+- Unify node and callback payload projection behind `observe_payload` with an
+  explicit `PayloadObservation` policy (`STRICT_OBSERVATION` /
+  `COMPACT_OBSERVATION`); span input is now curated through the same contract
+  projection as span output. `contracts.projection.project_node_payload` is
+  renamed to `observe_payload`.
+- No change to the package-root interface.
+
 ## 0.3.0 - 2026-07-11
 
 - Breaking: strict `contract_node` execution now enforces declared reads. A read

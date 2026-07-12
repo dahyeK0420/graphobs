@@ -14,8 +14,9 @@ from graphobs.contracts.models import (
     SubgraphContract,
 )
 from graphobs.contracts.projection import (
+    PayloadObservation,
+    observe_payload,
     project_input,
-    project_node_payload,
     project_output,
 )
 from graphobs.contracts.validation import (
@@ -121,37 +122,37 @@ def test_node_projects_changed_public_writes_only() -> None:
     }
 
 
-def test_project_node_payload_projects_input_or_output() -> None:
+def test_observe_payload_projects_input_or_output() -> None:
     contract = NodeContract(
         name="answer",
         reads=("request.text",),
         writes=("answer.text",),
     )
 
-    assert project_node_payload(
+    assert observe_payload(
         contract,
         {"request": {"text": "hello", "raw": "hidden"}},
         "input",
     ) == {"request": {"text": "hello"}}
-    assert project_node_payload(
+    assert observe_payload(
         contract,
         {"answer": {"text": "done", "debug": "hidden"}},
         "output",
     ) == {"answer": {"text": "done"}}
 
 
-def test_project_node_payload_can_fall_back_to_summary(
+def test_observe_payload_can_fall_back_to_summary(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     caplog.set_level(logging.WARNING, logger="graphobs.contracts")
     contract = cast(Contract, ContractWithFailingPolicies())
     payload = {"request": {"text": "hello", "raw": "hidden"}}
 
-    assert project_node_payload(
+    assert observe_payload(
         contract,
         payload,
         "input",
-        fallback_to_summary=True,
+        observation=PayloadObservation(fallback_to_summary=True),
     ) == {"input_summary": {"type": "mapping", "size": 1, "keys": ["request"]}}
     assert caplog.records[0].levelno == logging.WARNING
     assert (
@@ -161,11 +162,11 @@ def test_project_node_payload_can_fall_back_to_summary(
     assert "hidden" not in caplog.text
 
 
-def test_project_node_payload_raises_projection_errors_by_default() -> None:
+def test_observe_payload_raises_projection_errors_by_default() -> None:
     contract = cast(Contract, ContractWithFailingPolicies())
 
     with pytest.raises(RuntimeError, match="synthetic projection failure"):
-        project_node_payload(contract, {"request": "hello"}, "input")
+        observe_payload(contract, {"request": "hello"}, "input")
 
 
 def test_state_diff_reports_changed_after_state_paths_only() -> None:

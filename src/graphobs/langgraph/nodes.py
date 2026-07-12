@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import inspect
 import logging
-from collections.abc import Awaitable, Callable, Mapping
+from collections.abc import Awaitable, Callable, Iterable, Mapping
+from dataclasses import dataclass
+from enum import StrEnum
 from functools import wraps
 from typing import Any, Protocol, TypeAlias, cast, overload
 
@@ -39,6 +41,56 @@ AsyncNodeFunction: TypeAlias = Callable[..., Awaitable[StateUpdate]]
 NodeWrapper: TypeAlias = NodeFunction | AsyncNodeFunction
 
 
+class NodeContractMode(StrEnum):
+    """Selects how a contract-wrapped node treats state reads and violations.
+
+    The modes form an adoption ladder from non-invasive observation to strict
+    enforcement. Every mode still emits contract-projected span input and
+    output; the mode only changes execution:
+
+    - ``OBSERVE``: the node receives the full graph state unchanged. Undeclared
+      writes are logged as warnings and still forwarded, and reads are not
+      audited. Use for trace hygiene without any execution change.
+    - ``AUDIT``: like ``OBSERVE``, but undeclared reads are also logged as
+      warnings. Use during migration to surface a node's real state boundary.
+    - ``ENFORCE``: the node receives only its declared reads, and an undeclared
+      read or write raises ``StateContractError``. Use for stable nodes whose
+      boundary should be guaranteed.
+    """
+
+    OBSERVE = "observe"
+    AUDIT = "audit"
+    ENFORCE = "enforce"
+
+
+@dataclass(frozen=True)
+class _ModeExecution:
+    """Internal execution settings a ``NodeContractMode`` resolves to."""
+
+    pass_through_state: bool
+    audit_reads: bool
+    on_violation: ContractViolationAction
+
+
+_MODE_EXECUTIONS: dict[NodeContractMode, _ModeExecution] = {
+    NodeContractMode.OBSERVE: _ModeExecution(
+        pass_through_state=True,
+        audit_reads=False,
+        on_violation=ContractViolationAction.WARN,
+    ),
+    NodeContractMode.AUDIT: _ModeExecution(
+        pass_through_state=True,
+        audit_reads=True,
+        on_violation=ContractViolationAction.WARN,
+    ),
+    NodeContractMode.ENFORCE: _ModeExecution(
+        pass_through_state=False,
+        audit_reads=False,
+        on_violation=ContractViolationAction.RAISE,
+    ),
+}
+
+
 class ContractNodeDecorator(Protocol):
     """Decorator returned by ``contract_node(contract)``."""
 
@@ -61,9 +113,7 @@ def contract_node(
     contract: NodeContract,
     /,
     *,
-    on_violation: ContractViolationAction = ContractViolationAction.RAISE,
-    pass_through_state: bool = False,
-    audit_reads: bool = False,
+    mode: NodeContractMode = NodeContractMode.ENFORCE,
 ) -> ContractNodeDecorator: ...
 
 
@@ -72,9 +122,7 @@ def contract_node(
     fn: NodeFunction,
     contract: NodeContract,
     *,
-    on_violation: ContractViolationAction = ContractViolationAction.RAISE,
-    pass_through_state: bool = False,
-    audit_reads: bool = False,
+    mode: NodeContractMode = NodeContractMode.ENFORCE,
 ) -> NodeFunction: ...
 
 
@@ -83,9 +131,7 @@ def contract_node(
     fn: AsyncNodeFunction,
     contract: NodeContract,
     *,
-    on_violation: ContractViolationAction = ContractViolationAction.RAISE,
-    pass_through_state: bool = False,
-    audit_reads: bool = False,
+    mode: NodeContractMode = NodeContractMode.ENFORCE,
 ) -> AsyncNodeFunction: ...
 
 
@@ -93,31 +139,22 @@ def contract_node(
     fn: NodeWrapper | NodeContract,
     contract: NodeContract | None = None,
     *,
-    on_violation: ContractViolationAction = ContractViolationAction.RAISE,
-    pass_through_state: bool = False,
-    audit_reads: bool = False,
+    mode: NodeContractMode = NodeContractMode.ENFORCE,
 ) -> NodeWrapper | ContractNodeDecorator:
     """Wraps a LangGraph node with contract projection, validation, and tracing.
 
-    The wrapped node receives only declared public reads plus declared private
-    reads. The emitted span input and output remain public-contract projections.
-    The helper can be called as ``contract_node(fn, contract)`` or used as a
-    decorator with ``@contract_node(contract)``.
-
-    Strict execution audits reads and enforces them with ``on_violation``, so a
-    read outside the contract raises ``StateContractError`` by default instead
-    of silently resolving to a projected default value.
+    The emitted span input and output are always public-contract projections.
+    The ``mode`` decides how execution is affected, from non-invasive
+    ``OBSERVE`` through migration-friendly ``AUDIT`` to strict ``ENFORCE`` (see
+    ``NodeContractMode``). The helper can be called as ``contract_node(fn,
+    contract)`` or used as a decorator with ``@contract_node(contract)``.
 
     Args:
         fn: Node function to wrap, or a contract when used as a decorator.
         contract: Node state and trace contract for explicit wrapping.
-        on_violation: Whether undeclared writes, and undeclared reads in strict
-            execution, raise or log a warning.
-        pass_through_state: Whether the wrapped node should receive the
-            original graph state instead of projected execution input.
-        audit_reads: In pass-through execution, whether undeclared reads log a
-            warning. Strict execution always audits reads and enforces them
-            with ``on_violation``.
+        mode: Execution mode from ``NodeContractMode``. Defaults to
+            ``ENFORCE``, which projects the node's input to declared reads and
+            raises on an undeclared read or write.
 
     Returns:
         A callable with the same sync or async execution style as the original
@@ -126,6 +163,7 @@ def contract_node(
     Raises:
         TypeError: If called with an unsupported argument shape.
     """
+    execution = _mode_execution(mode)
     if isinstance(fn, NodeContract) and contract is None:
         decorator_contract = fn
 
@@ -133,21 +171,13 @@ def contract_node(
             return _wrap_contract_node(
                 node_fn,
                 decorator_contract,
-                on_violation=on_violation,
-                pass_through_state=pass_through_state,
-                audit_reads=audit_reads,
+                execution=execution,
             )
 
         return cast(ContractNodeDecorator, decorator)
 
     if callable(fn) and isinstance(contract, NodeContract):
-        return _wrap_contract_node(
-            fn,
-            contract,
-            on_violation=on_violation,
-            pass_through_state=pass_through_state,
-            audit_reads=audit_reads,
-        )
+        return _wrap_contract_node(fn, contract, execution=execution)
 
     error = TypeError(
         "contract_node expects (fn, contract) or (contract) for decorator use"
@@ -160,15 +190,9 @@ def _wrap_contract_node(
     fn: NodeWrapper,
     contract: NodeContract,
     *,
-    on_violation: ContractViolationAction,
-    pass_through_state: bool,
-    audit_reads: bool,
+    execution: _ModeExecution,
 ) -> NodeWrapper:
-    track_reads, read_violation = _read_audit_plan(
-        pass_through_state=pass_through_state,
-        audit_reads=audit_reads,
-        on_violation=on_violation,
-    )
+    track_reads, read_violation = _read_audit_plan(execution)
     if inspect.iscoroutinefunction(fn):
         async_fn = cast(AsyncNodeFunction, fn)
 
@@ -188,10 +212,10 @@ def _wrap_contract_node(
                 execution_input=lambda raw_state: _node_execution_input(
                     contract,
                     raw_state,
-                    pass_through_state=pass_through_state,
+                    pass_through_state=execution.pass_through_state,
                     tracker=tracker,
                 ),
-                on_violation=on_violation,
+                on_violation=execution.on_violation,
                 logger=LOGGER,
             )
             return await instrument_contract_arun(
@@ -220,10 +244,10 @@ def _wrap_contract_node(
             execution_input=lambda raw_state: _node_execution_input(
                 contract,
                 raw_state,
-                pass_through_state=pass_through_state,
+                pass_through_state=execution.pass_through_state,
                 tracker=tracker,
             ),
-            on_violation=on_violation,
+            on_violation=execution.on_violation,
             logger=LOGGER,
         )
         return instrument_contract_run(
@@ -240,9 +264,7 @@ def add_contract_node(
     contract: NodeContract,
     fn: NodeWrapper,
     *,
-    on_violation: ContractViolationAction = ContractViolationAction.RAISE,
-    pass_through_state: bool = False,
-    audit_reads: bool = False,
+    mode: NodeContractMode = NodeContractMode.ENFORCE,
 ) -> object:
     """Adds a contract-wrapped node to a LangGraph ``StateGraph`` builder.
 
@@ -250,23 +272,19 @@ def add_contract_node(
         graph: Graph builder exposing ``add_node``.
         contract: Node state and trace contract.
         fn: Synchronous or asynchronous node function.
-        on_violation: Whether undeclared writes, and undeclared reads in strict
-            execution, raise or log a warning.
-        pass_through_state: Whether the node receives the original graph state.
-        audit_reads: In pass-through execution, whether undeclared reads are
-            logged. Strict execution always audits reads.
+        mode: Execution mode from ``NodeContractMode``. ``ENFORCE`` registers a
+            narrowed input schema; ``OBSERVE`` and ``AUDIT`` register the node
+            against the full graph state.
 
     Returns:
         The graph builder returned by ``add_node``.
     """
-    wrapped = contract_node(
-        fn,
-        contract,
-        on_violation=on_violation,
-        pass_through_state=pass_through_state,
-        audit_reads=audit_reads,
+    wrapped = contract_node(fn, contract, mode=mode)
+    input_schema = (
+        None
+        if _mode_execution(mode).pass_through_state
+        else langgraph_input_schema(contract)
     )
-    input_schema = None if pass_through_state else langgraph_input_schema(contract)
 
     try:
         if input_schema is None:
@@ -277,29 +295,55 @@ def add_contract_node(
         raise
 
 
-def _read_audit_plan(
+def add_contract_nodes(
+    graph: NodeBuilder,
+    contracts: Iterable[tuple[NodeContract, NodeWrapper]],
     *,
-    pass_through_state: bool,
-    audit_reads: bool,
-    on_violation: ContractViolationAction,
+    mode: NodeContractMode = NodeContractMode.ENFORCE,
+) -> tuple[object, ...]:
+    """Registers several contract-wrapped nodes on a graph builder in one call.
+
+    One execution mode is applied uniformly to every node, which suits initial
+    whole-graph adoption in ``NodeContractMode.OBSERVE`` before promoting
+    individual nodes to ``NodeContractMode.ENFORCE``.
+
+    Args:
+        graph: Graph builder exposing ``add_node``.
+        contracts: ``(contract, node function)`` pairs in registration order.
+        mode: Execution mode applied to every registered node.
+
+    Returns:
+        The ``add_node`` results in registration order.
+    """
+    return tuple(
+        add_contract_node(graph, contract, fn, mode=mode) for contract, fn in contracts
+    )
+
+
+def _mode_execution(mode: NodeContractMode) -> _ModeExecution:
+    """Resolves the execution settings for one node contract mode."""
+    return _MODE_EXECUTIONS[mode]
+
+
+def _read_audit_plan(
+    execution: _ModeExecution,
 ) -> tuple[bool, ContractViolationAction]:
     """Decides whether to audit reads and how read violations are handled.
 
     Strict execution always audits reads and enforces them with the node's
-    violation action, so undeclared reads fail loudly by default instead of
-    silently resolving to a projected value. Pass-through execution keeps
-    auditing opt-in and warning-only, because the node intentionally receives
-    the full graph state. The returned action is unused when reads are not
-    audited.
+    violation action, so undeclared reads fail loudly instead of silently
+    resolving to a projected value. Pass-through execution keeps auditing
+    opt-in and warning-only, because the node intentionally receives the full
+    graph state. The returned action is unused when reads are not audited.
 
     Returns:
         A ``(audit_reads, read_violation)`` pair.
     """
-    if not pass_through_state:
-        return True, on_violation
-    if audit_reads:
+    if not execution.pass_through_state:
+        return True, execution.on_violation
+    if execution.audit_reads:
         return True, ContractViolationAction.WARN
-    return False, on_violation
+    return False, execution.on_violation
 
 
 def _node_attributes(contract: NodeContract) -> Mapping[str, object]:
@@ -332,8 +376,10 @@ __all__ = [
     "AsyncNodeFunction",
     "ContractNodeDecorator",
     "NodeBuilder",
+    "NodeContractMode",
     "NodeFunction",
     "NodeWrapper",
     "add_contract_node",
+    "add_contract_nodes",
     "contract_node",
 ]

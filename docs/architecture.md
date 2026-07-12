@@ -26,7 +26,7 @@ flowchart TD
 
     %% ---------- Core (pure Python) ----------
     subgraph core["Core contract layer — pure Python, runtime-independent"]
-        contracts["contracts/<br/>NodeContract · SubgraphContract<br/>ProjectionPolicy · validate_update<br/>models · projection · validation"]
+        contracts["contracts/<br/>NodeContract · SubgraphContract<br/>ProjectionPolicy · validate_update<br/>models · projection · validation · conformance"]
         discovery["discovery/<br/>drafts DiscoveredContract<br/>from synthetic samples<br/>runner · draft"]
     end
 
@@ -34,7 +34,7 @@ flowchart TD
     subgraph shared["Shared primitives — implemented once, reused everywhere"]
         policy["_observability/payload_policy.py<br/>internal payload hub"]
         payloads["payloads.py<br/>shape_summary<br/>message_compact_summary"]
-        state["state/<br/>dotted paths · read tracking<br/>state diffs · private overrides<br/>paths · observed_access · policies · read_tracking"]
+        state["state/<br/>dotted paths · read tracking<br/>state diffs · private overrides<br/>paths · observed_access · read_tracking"]
     end
 
     %% ---------- External ----------
@@ -103,6 +103,7 @@ src/graphobs/
   py.typed
   contracts/
     __init__.py
+    conformance.py
     models.py
     projection.py
     validation.py
@@ -110,7 +111,6 @@ src/graphobs/
     __init__.py
     observed_access.py
     paths.py
-    policies.py
     read_tracking.py
   langgraph/
     __init__.py

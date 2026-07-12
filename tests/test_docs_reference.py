@@ -20,6 +20,7 @@ EXPECTED_REFERENCE_TARGETS = {
     "discovery.md": (
         "graphobs.discovery.draft",
         "graphobs.discovery.runner",
+        "graphobs.discovery.drift",
     ),
     "langgraph.md": (
         "graphobs.langgraph.nodes",

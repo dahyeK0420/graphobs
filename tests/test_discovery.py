@@ -6,7 +6,13 @@ from collections.abc import Mapping
 
 import pytest
 
+from graphobs.contracts.models import NodeContract
 from graphobs.discovery.draft import DiscoveredContract
+from graphobs.discovery.drift import (
+    ContractDriftError,
+    assert_contract_amatches,
+    assert_contract_matches,
+)
 from graphobs.discovery.runner import (
     ContractDiscoveryError,
     adiscover_contract,
@@ -180,3 +186,123 @@ def test_discovery_rejects_non_mapping_updates() -> None:
 
     assert isinstance(error.value.__cause__, TypeError)
     assert "unsupported update type" in str(error.value)
+
+
+def test_assert_contract_matches_returns_draft_when_within_contract() -> None:
+    def classify(state: Mapping[str, object]) -> Mapping[str, object]:
+        request = state["request"]
+        text = request["text"] if isinstance(request, Mapping) else ""
+        return {"classification": {"label": str(text)}}
+
+    contract = NodeContract(
+        name="classify",
+        reads=("request.text",),
+        writes=("classification.label",),
+    )
+
+    draft = assert_contract_matches(
+        classify,
+        contract,
+        [{"request": {"text": "hello", "raw": "ignored"}}],
+    )
+
+    assert draft.name == "classify"
+    assert draft.reads == ("request.text",)
+    assert draft.writes == ("classification.label",)
+
+
+def test_assert_contract_matches_detects_undeclared_read() -> None:
+    def classify(state: Mapping[str, object]) -> Mapping[str, object]:
+        request = state["request"]
+        secret = state["secret"]
+        return {"classification": {"label": f"{request}-{secret}"}}
+
+    contract = NodeContract(
+        name="classify",
+        reads=("request",),
+        writes=("classification.label",),
+    )
+
+    with pytest.raises(ContractDriftError) as error:
+        assert_contract_matches(
+            classify,
+            contract,
+            [{"request": {"text": "hi"}, "secret": "token"}],
+        )
+
+    assert error.value.node_name == "classify"
+    assert error.value.undeclared_reads == ("secret",)
+    assert error.value.undeclared_writes == ()
+
+
+def test_assert_contract_matches_detects_undeclared_write() -> None:
+    def classify(state: Mapping[str, object]) -> Mapping[str, object]:
+        request = state["request"]
+        return {
+            "classification": {"label": str(request)},
+            "debug": {"trace": "unexpected"},
+        }
+
+    contract = NodeContract(
+        name="classify",
+        reads=("request",),
+        writes=("classification.label",),
+    )
+
+    with pytest.raises(ContractDriftError) as error:
+        assert_contract_matches(
+            classify,
+            contract,
+            [{"request": {"text": "hi"}}],
+        )
+
+    assert error.value.undeclared_reads == ()
+    assert error.value.undeclared_writes == ("debug.trace",)
+
+
+def test_assert_contract_amatches_detects_drift() -> None:
+    async def answer(state: Mapping[str, object]) -> Mapping[str, object]:
+        await asyncio.sleep(0)
+        request = state["request"]
+        return {"answer": {"text": str(request)}, "scratch": {"note": "x"}}
+
+    contract = NodeContract(
+        name="answer",
+        reads=("request",),
+        writes=("answer.text",),
+    )
+
+    with pytest.raises(ContractDriftError) as error:
+        asyncio.run(
+            assert_contract_amatches(
+                answer,
+                contract,
+                [{"request": {"text": "hi"}}],
+            )
+        )
+
+    assert error.value.undeclared_writes == ("scratch.note",)
+
+
+def test_contract_drift_error_reports_paths_without_sampled_values(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    caplog.set_level(logging.ERROR, logger="graphobs.discovery")
+
+    def classify(state: Mapping[str, object]) -> Mapping[str, object]:
+        state["request"]
+        return {"leak": "secret-value"}
+
+    contract = NodeContract(name="classify", reads=("request",), writes=())
+
+    with pytest.raises(ContractDriftError) as error:
+        assert_contract_matches(
+            classify,
+            contract,
+            [{"request": {"text": "secret-value"}}],
+        )
+
+    assert error.value.undeclared_writes == ("leak",)
+    assert "secret-value" not in str(error.value)
+    assert "secret-value" not in caplog.text
+    assert caplog.records[0].levelno == logging.ERROR

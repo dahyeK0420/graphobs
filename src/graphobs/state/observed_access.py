@@ -14,8 +14,8 @@ from graphobs.state.paths import (
 )
 
 
-class ObservedReadPolicy(Protocol):
-    """Minimal include/exclude policy shape for observed state reads."""
+class PathPolicy(Protocol):
+    """Minimal include/exclude policy shape for state read and write checks."""
 
     @property
     def include(self) -> tuple[str, ...] | None:
@@ -109,7 +109,7 @@ class ObservedStatePaths:
 
     def undeclared_for(
         self,
-        policies: Iterable[ObservedReadPolicy],
+        policies: Iterable[PathPolicy],
     ) -> tuple[str, ...]:
         """Returns observed paths not allowed by any read policy."""
         policy_tuple = tuple(policies)
@@ -125,12 +125,31 @@ class ObservedStatePaths:
 
 def policy_allows_observed_read_path(
     path: Path,
-    policy: ObservedReadPolicy,
+    policy: PathPolicy,
 ) -> bool:
-    """Returns whether a policy allows an observed state read path."""
+    """Returns whether a policy allows an observed state read path.
+
+    A read is allowed when a declared include path overlaps the observed path in
+    either direction, and no exclude path overlaps it.
+    """
     include_paths = _include_paths(policy)
     included = include_paths is None or any(
         paths_overlap(allowed_path, path) for allowed_path in include_paths
+    )
+    return included and not _excluded(path, policy)
+
+
+def policy_allows_write_path(path: Path, policy: PathPolicy) -> bool:
+    """Returns whether a policy allows writing a concrete update path.
+
+    A write is allowed when a declared include path is an ancestor of (or equal
+    to) the update path, and no exclude path overlaps it. This is stricter than
+    the read check: a write must fall under a declared path, not merely overlap
+    one.
+    """
+    include_paths = _include_paths(policy)
+    included = include_paths is None or any(
+        is_prefix(allowed_path, path) for allowed_path in include_paths
     )
     return included and not _excluded(path, policy)
 
@@ -140,13 +159,13 @@ def paths_overlap(left: Path, right: Path) -> bool:
     return is_prefix(left, right) or is_prefix(right, left)
 
 
-def _include_paths(policy: ObservedReadPolicy) -> tuple[Path, ...] | None:
+def _include_paths(policy: PathPolicy) -> tuple[Path, ...] | None:
     if policy.include is None:
         return None
     return tuple(split_path(path_text) for path_text in policy.include)
 
 
-def _excluded(path: Path, policy: ObservedReadPolicy) -> bool:
+def _excluded(path: Path, policy: PathPolicy) -> bool:
     exclude_paths = tuple(split_path(path_text) for path_text in policy.exclude)
     return any(paths_overlap(excluded_path, path) for excluded_path in exclude_paths)
 
@@ -168,9 +187,10 @@ def _parsed_paths(paths: Iterable[str]) -> tuple[tuple[str, Path], ...]:
 
 
 __all__ = [
-    "ObservedReadPolicy",
     "ObservedStatePaths",
+    "PathPolicy",
     "PrivatePathPartition",
     "paths_overlap",
     "policy_allows_observed_read_path",
+    "policy_allows_write_path",
 ]

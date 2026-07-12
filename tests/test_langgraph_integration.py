@@ -33,7 +33,9 @@ from graphobs.langgraph.execution import (
     subgraph_contract_run_spec,
 )
 from graphobs.langgraph.nodes import (
+    NodeContractMode,
     add_contract_node,
+    add_contract_nodes,
     contract_node,
 )
 from graphobs.langgraph.schemas import langgraph_input_schema
@@ -177,7 +179,7 @@ def test_contract_node_can_pass_through_state_while_projecting_span(
         reads=("request.text",),
         writes=("classification.label",),
     )
-    wrapped = contract_node(classify, contract, pass_through_state=True)
+    wrapped = contract_node(classify, contract, mode=NodeContractMode.OBSERVE)
 
     result = wrapped(
         {
@@ -217,8 +219,7 @@ def test_contract_node_audit_reads_warns_for_undeclared_paths(
     wrapped = contract_node(
         classify,
         contract,
-        pass_through_state=True,
-        audit_reads=True,
+        mode=NodeContractMode.AUDIT,
     )
 
     result = wrapped(
@@ -253,8 +254,7 @@ def test_contract_node_audit_reads_allows_parent_read_policy(
     wrapped = contract_node(
         classify,
         contract,
-        pass_through_state=True,
-        audit_reads=True,
+        mode=NodeContractMode.AUDIT,
     )
 
     result = wrapped({"context": {"extra": "allowed"}})
@@ -283,8 +283,7 @@ def test_contract_node_pass_through_and_audit_support_async_nodes(
     wrapped = contract_node(
         classify_async,
         contract,
-        pass_through_state=True,
-        audit_reads=True,
+        mode=NodeContractMode.AUDIT,
     )
 
     async def invoke_wrapped() -> MappingState:
@@ -336,34 +335,6 @@ def test_contract_node_strict_mode_raises_for_undeclared_read() -> None:
 
     assert error.value.access == "read"
     assert error.value.undeclared_paths == ("context",)
-
-
-def test_contract_node_strict_mode_can_warn_for_undeclared_read(
-    caplog: pytest.LogCaptureFixture,
-) -> None:
-    caplog.set_level(logging.WARNING, logger="graphobs.langgraph")
-
-    def classify(state: MappingState) -> MappingState:
-        state.get("context")
-        return {"classification": {"label": "greeting"}}
-
-    contract = NodeContract(
-        name="classify_strict_warn",
-        reads=("request.text",),
-        writes=("classification.label",),
-    )
-    wrapped = contract_node(
-        classify,
-        contract,
-        on_violation=ContractViolationAction.WARN,
-    )
-
-    result = wrapped({"request": {"text": "hello"}})
-
-    assert result == {"classification": {"label": "greeting"}}
-    assert caplog.messages == [
-        "Contract 'classify_strict_warn' read undeclared state paths: context"
-    ]
 
 
 def test_contract_node_forwards_langgraph_config() -> None:
@@ -753,7 +724,7 @@ def test_undeclared_node_write_can_warn_and_continue(
     wrapped = contract_node(
         classify,
         contract,
-        on_violation=ContractViolationAction.WARN,
+        mode=NodeContractMode.OBSERVE,
     )
 
     result = wrapped({"request": {"text": "hello"}})
@@ -803,12 +774,12 @@ def test_langgraph_input_schema_and_add_contract_node() -> None:
     assert returned_graph is graph
 
 
-def test_add_contract_node_omits_input_schema_for_pass_through_state() -> None:
+def test_add_contract_node_omits_input_schema_for_observe_mode() -> None:
     def classify(state: MappingState) -> MappingState:
         return {"classification": {"label": str(state["request"])}}
 
     contract = NodeContract(
-        name="classify_passthrough_schema",
+        name="classify_observe_schema",
         reads=("request.text",),
         writes=("classification.label",),
     )
@@ -818,7 +789,7 @@ def test_add_contract_node_omits_input_schema_for_pass_through_state() -> None:
         graph,
         contract,
         classify,
-        pass_through_state=True,
+        mode=NodeContractMode.OBSERVE,
     )
 
     assert returned_graph is graph
@@ -826,8 +797,41 @@ def test_add_contract_node_omits_input_schema_for_pass_through_state() -> None:
     call = graph.calls[0]
     assert call["kwargs"] == {}
     args = cast(tuple[object, ...], call["args"])
-    assert args[0] == "classify_passthrough_schema"
+    assert args[0] == "classify_observe_schema"
     assert callable(args[1])
+
+
+def test_add_contract_nodes_registers_every_node_in_order() -> None:
+    def classify(state: MappingState) -> MappingState:
+        return {"classification": {"label": "greeting"}}
+
+    def answer(state: MappingState) -> MappingState:
+        return {"answer": {"text": "done"}}
+
+    classify_contract = NodeContract(
+        name="classify",
+        reads=("request.text",),
+        writes=("classification.label",),
+    )
+    answer_contract = NodeContract(
+        name="answer",
+        reads=("classification.label",),
+        writes=("answer.text",),
+    )
+    graph = _RecordingGraph()
+
+    results = add_contract_nodes(
+        graph,
+        [(classify_contract, classify), (answer_contract, answer)],
+        mode=NodeContractMode.OBSERVE,
+    )
+
+    assert results == (graph, graph)
+    registered_names = [
+        cast(tuple[object, ...], call["args"])[0] for call in graph.calls
+    ]
+    assert registered_names == ["classify", "answer"]
+    assert all(call["kwargs"] == {} for call in graph.calls)
 
 
 def test_langgraph_input_schema_includes_subgraph_private_state() -> None:
