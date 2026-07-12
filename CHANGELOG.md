@@ -37,8 +37,6 @@ This project follows Semantic Versioning once public releases begin.
   mode/serialize policy from `_observability/payload_policy.py` merges into
   `payloads.py`. The `_observability` and empty `_integrations` packages are
   removed.
-- No change to the package-root interface, subgraph contracts, or node contract
-  modes (`OBSERVE`/`AUDIT`/`ENFORCE`).
 
 ## 0.3.1 - 2026-07-12
 
