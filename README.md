@@ -1,6 +1,6 @@
 # graphobs
 
-**Contract-first observability for graph-based Python apps.**
+**Contract-first observability for LangGraph**
 
 graphobs helps teams describe graph state boundaries once, then reuse those declarations for trace payloads, structured logs, and validation.
 
