@@ -177,7 +177,6 @@ def test_custom_correlation_fields_propagate_to_metadata_and_logs(
     event = _graph_log_events(caplog)[0]
 
     assert config["metadata"] == context.as_metadata(fields)
-    assert context.as_attributes(fields) == context.as_metadata(fields)
     assert event["session.id"] == "session-3"
     assert event["conversation.id"] == "conversation-3"
     assert event["turn.id"] == "turn-3"
@@ -292,7 +291,7 @@ def test_logs_and_spans_share_correlation_without_trace_payloads(
     run_id = uuid4()
     callback = GraphLogCallback(context)
 
-    with start_graph_span("answer", "CHAIN", attributes=context.as_attributes()):
+    with start_graph_span("answer", "CHAIN", attributes=context.as_metadata()):
         callback.on_chain_start(
             {"name": "answer"},
             {"request": {"text": LARGE_VALUE}},

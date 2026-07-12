@@ -1,8 +1,17 @@
-"""Public compact payload summary helpers."""
+"""Compact payload summaries and the shared trace payload policy.
+
+Structural summary helpers (``shape_summary``, ``message_compact_summary``) are
+the public surface. The trace payload mode dispatch, JSON serialization, and
+contract projection fallback policy live here too so compact-by-default
+behavior is defined exactly once and reused by contracts, tracing, and logging.
+"""
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+import json
+import logging
+from collections.abc import Callable, Mapping, Sequence
+from typing import Literal
 
 _DEFAULT_CONTENT_LIMIT = 4000
 
@@ -22,6 +31,8 @@ _BULKY_MESSAGE_KEYS: frozenset[str] = frozenset(
         "tool_call_chunks",
     }
 )
+
+PayloadKind = Literal["input", "output"]
 
 
 def shape_summary(value: object) -> dict[str, object]:
@@ -98,6 +109,62 @@ def message_compact_summary(
     return shape_summary(value)
 
 
+def prepare_trace_payload(value: object, *, mode: object) -> object:
+    """Prepares a value according to the default trace payload mode."""
+    mode_value = _mode_value(mode)
+    if mode_value == "message_compact":
+        return message_compact_summary(value)
+    if mode_value == "compact":
+        return shape_summary(value)
+    if mode_value == "full":
+        return value
+    raise ValueError(f"unsupported trace payload mode: {mode!r}")
+
+
+def serialize_trace_payload(value: object, *, mode: object) -> str:
+    """Serializes a trace payload using the shared default payload policy."""
+    prepared = prepare_trace_payload(value, mode=mode)
+    return json.dumps(prepared, sort_keys=True, separators=(",", ":"))
+
+
+def summary_payload_field(kind: PayloadKind, value: object) -> dict[str, object]:
+    """Builds an input/output summary payload field."""
+    return {f"{kind}_summary": shape_summary(value)}
+
+
+def project_contract_payload(
+    *,
+    contract_label: str,
+    payload: Mapping[str, object],
+    payload_kind: PayloadKind,
+    project: Callable[[Mapping[str, object]], dict[str, object]],
+    logger: logging.Logger,
+    fallback_to_summary: bool,
+    compact_projected: bool = False,
+) -> dict[str, object]:
+    """Projects a contract payload and applies fallback/compaction policy."""
+    try:
+        projected = project(payload)
+    except Exception as exc:
+        if not fallback_to_summary:
+            raise
+        logger.warning(
+            "Could not project %s payload for contract %s; "
+            "using compact summary after %s: %s",
+            payload_kind,
+            contract_label,
+            type(exc).__name__,
+            exc,
+        )
+        return summary_payload_field(payload_kind, payload)
+
+    if compact_projected:
+        compacted = message_compact_summary(projected)
+        if isinstance(compacted, Mapping):
+            return dict(compacted)
+    return projected
+
+
 def _is_message(value: object) -> bool:
     if isinstance(value, Mapping):
         return "content" in value and ("role" in value or "type" in value)
@@ -124,6 +191,10 @@ def _truncate(content: object, limit: int) -> object:
         overflow = len(content) - limit
         return f"{content[:limit]}…(+{overflow} chars)"
     return content
+
+
+def _mode_value(mode: object) -> object:
+    return getattr(mode, "value", mode)
 
 
 __all__ = ["message_compact_summary", "shape_summary"]

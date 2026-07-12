@@ -8,6 +8,6 @@ These modules do not require a graph runtime or telemetry backend.
 
 ::: graphobs.contracts.projection
 
-::: graphobs.contracts.validation
+::: graphobs.contracts.conformance
 
 ::: graphobs.state.paths

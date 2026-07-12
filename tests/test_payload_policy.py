@@ -6,12 +6,6 @@ from collections.abc import Mapping, Sequence
 
 import pytest
 
-from graphobs._observability.payload_policy import (
-    payload_summary,
-    prepare_trace_payload,
-    project_contract_payload,
-    serialize_trace_payload,
-)
 from graphobs.contracts.models import NodeContract
 from graphobs.langgraph.callbacks import project_callback_payloads
 from graphobs.logging.context import (
@@ -22,11 +16,14 @@ from graphobs.logging.lifecycle import (
     build_finish_payload,
     build_start_payload,
 )
-from graphobs.payloads import message_compact_summary, shape_summary
-from graphobs.tracing import (
-    TracePayloadMode,
-    default_payload_serializer,
+from graphobs.payloads import (
+    message_compact_summary,
+    prepare_trace_payload,
+    project_contract_payload,
+    serialize_trace_payload,
+    shape_summary,
 )
+from graphobs.tracing import TracePayloadMode
 
 LARGE_VALUE = "do not expose this full payload value " * 20
 
@@ -42,13 +39,6 @@ def test_trace_serializer_delegates_to_payload_policy() -> None:
         shape_summary(payload)
     )
     assert prepare_trace_payload(payload, mode=TracePayloadMode.FULL) is payload
-
-    for mode in TracePayloadMode:
-        serialized = serialize_trace_payload(
-            payload,
-            mode=mode,
-        )
-        assert default_payload_serializer(payload, mode=mode) == serialized
 
     assert LARGE_VALUE not in serialize_trace_payload(
         payload,
@@ -79,7 +69,7 @@ def test_projection_fallback_uses_policy_summary_and_safe_warning(
         fallback_to_summary=True,
     )
 
-    assert result == {"input_summary": payload_summary(payload)}
+    assert result == {"input_summary": shape_summary(payload)}
     assert caplog.messages == [
         "Could not project input payload for contract failing; "
         "using compact summary after RuntimeError: synthetic projection failure"
@@ -141,8 +131,8 @@ def test_lifecycle_payload_summaries_use_shared_policy() -> None:
         duration_ms=1.0,
     )
 
-    assert start_payload["input_summary"] == payload_summary(input_payload)
-    assert finish_payload["output_summary"] == payload_summary(output_payload)
+    assert start_payload["input_summary"] == shape_summary(input_payload)
+    assert finish_payload["output_summary"] == shape_summary(output_payload)
     assert LARGE_VALUE not in str(start_payload)
     assert LARGE_VALUE not in str(finish_payload)
 

@@ -8,15 +8,10 @@ from enum import StrEnum
 from types import MappingProxyType
 from typing import Literal, Protocol, TypeAlias
 
-from graphobs._observability.payload_policy import payload_summary
+from graphobs.contracts.projection import project_state
 from graphobs.state.paths import (
     StateMapping,
-    delete_path,
-    get_path,
     normalize_optional_paths,
-    normalize_paths,
-    set_path,
-    split_path,
 )
 
 AttributeValue = str | int | float | bool | None
@@ -64,46 +59,28 @@ class StateContractError(ValueError):
 
 @dataclass(frozen=True, init=False)
 class ProjectionPolicy:
-    """Selects, removes, and summarizes nested state paths.
+    """Selects nested state paths for projection.
 
     Paths use dotted notation, such as ``"request.text"``. An omitted
-    ``include`` value means all top-level state is initially selected. An empty
-    include collection selects nothing.
+    ``include`` value means all top-level state is selected. An empty include
+    collection selects nothing.
 
     Attributes:
         include: Dotted paths to include, or ``None`` to include all state.
-        exclude: Dotted paths to remove after inclusion.
-        summarize: Dotted paths to replace with compact metadata.
     """
 
     include: tuple[str, ...] | None
-    exclude: tuple[str, ...]
-    summarize: tuple[str, ...]
 
-    def __init__(
-        self,
-        include: Iterable[str] | None = None,
-        *,
-        exclude: Iterable[str] = (),
-        summarize: Iterable[str] = (),
-    ) -> None:
+    def __init__(self, include: Iterable[str] | None = None) -> None:
         """Creates a projection policy.
 
         Args:
             include: Dotted paths to include, or ``None`` to include all state.
-            exclude: Dotted paths to remove from the projected state.
-            summarize: Dotted paths to replace with compact summary metadata.
         """
         object.__setattr__(self, "include", normalize_optional_paths(include))
-        object.__setattr__(self, "exclude", normalize_paths(exclude))
-        object.__setattr__(self, "summarize", normalize_paths(summarize))
 
     def project(self, state: StateMapping) -> dict[str, object]:
         """Projects state according to this policy.
-
-        Applies the policy in order: select ``include`` paths (or all state when
-        ``include`` is ``None``), remove ``exclude`` paths, then replace
-        ``summarize`` paths with a compact shape summary.
 
         Args:
             state: Mapping of graph state keys to values.
@@ -111,26 +88,7 @@ class ProjectionPolicy:
         Returns:
             A new dictionary containing only the selected public state.
         """
-        if self.include is None:
-            projected: dict[str, object] = dict(state)
-        else:
-            projected = {}
-            for path_text in self.include:
-                path = split_path(path_text)
-                found, value = get_path(state, path)
-                if found:
-                    set_path(projected, path, value)
-
-        for path_text in self.exclude:
-            delete_path(projected, split_path(path_text))
-
-        for path_text in self.summarize:
-            path = split_path(path_text)
-            found, value = get_path(projected, path)
-            if found:
-                set_path(projected, path, payload_summary(value))
-
-        return projected
+        return project_state(self, state)
 
 
 ProjectionSpec: TypeAlias = ProjectionPolicy | Iterable[str]

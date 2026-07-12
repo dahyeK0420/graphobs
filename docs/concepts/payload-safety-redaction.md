@@ -18,9 +18,9 @@ summary = shape_summary({"request": {"text": "hello"}})
 
 ## Compact Mode
 
-`TracePayloadMode`, `PayloadSerializer`, and `default_payload_serializer` are
-public APIs from `graphobs.tracing`. `TracePayloadMode.COMPACT`
-records summaries such as mapping size, keys, string length, and sequence size.
+`TracePayloadMode` is a public API from `graphobs.tracing`.
+`TracePayloadMode.COMPACT` records summaries such as mapping size, keys, string
+length, and sequence size.
 
 ```python
 from graphobs.tracing import start_graph_span
@@ -50,37 +50,6 @@ with start_graph_span(
 ```
 
 Do not use full mode for sensitive production payloads.
-
-## Custom Serializers
-
-Applications can provide a `PayloadSerializer` callable when compact summaries
-need project-specific rules.
-
-```python
-import json
-
-from graphobs.tracing import (
-    TracePayloadMode,
-    default_payload_serializer,
-)
-
-
-def redacting_serializer(
-    value: object,
-    *,
-    mode: TracePayloadMode = TracePayloadMode.COMPACT,
-) -> str:
-    if mode is TracePayloadMode.COMPACT and isinstance(value, dict):
-        return json.dumps(
-            {"type": "mapping", "redacted": "secret" in value},
-            sort_keys=True,
-            separators=(",", ":"),
-        )
-    return default_payload_serializer(value, mode=mode)
-```
-
-Keep serializer behavior deterministic. The goal is to make safe payload shape
-repeatable across local tests and observability backends.
 
 ## Callback Boundaries
 
@@ -120,4 +89,3 @@ custom graph construction change node metadata names.
 - Wrap callbacks when they should observe the contract-projected node payload.
 - Keep logs to lifecycle and correlation fields.
 - Avoid full state dumps in logs, span attributes, and examples.
-- Test serializer behavior with synthetic payloads before enabling it broadly.

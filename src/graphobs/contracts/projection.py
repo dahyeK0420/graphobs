@@ -4,11 +4,19 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
-from graphobs._observability.payload_policy import project_contract_payload
-from graphobs.contracts.models import Contract
-from graphobs.state.paths import StateMapping, state_diff
+from graphobs.payloads import project_contract_payload
+from graphobs.state.paths import (
+    StateMapping,
+    get_path,
+    set_path,
+    split_path,
+    state_diff,
+)
+
+if TYPE_CHECKING:
+    from graphobs.contracts.models import Contract, ProjectionPolicy
 
 LOGGER = logging.getLogger("graphobs.contracts")
 
@@ -54,17 +62,10 @@ def project_output(
 class PayloadObservation:
     """How an observed contract payload is projected for telemetry.
 
-    Controls the two knobs applied after a contract's projection policy runs. It
-    does not choose which policy is applied; it only decides what happens on a
-    projection failure and whether the projected payload is compacted in this
-    layer.
-
-    The two knobs exist because the span path and the callback path compact in
-    different places. The span path uses ``STRICT_OBSERVATION`` and leaves final
-    compaction to the tracing serializer (message-compact by default). The
-    callback path has no span to serialize, so it uses ``COMPACT_OBSERVATION``
-    to compact inline. Both routes reduce through the same
-    ``message_compact_summary`` helper, so they agree on shape.
+    The span execution path and the callback projection path observe the same
+    node through different mechanisms; passing one of these explicitly to
+    ``observe_payload`` keeps the projection identical between them instead of
+    letting fallback and compaction diverge silently.
 
     Attributes:
         fallback_to_summary: Whether a projection failure returns a compact
@@ -125,6 +126,22 @@ def observe_payload(
     )
 
 
+def project_state(
+    policy: ProjectionPolicy,
+    state: StateMapping,
+) -> dict[str, object]:
+    """Projects state according to one projection policy."""
+    if policy.include is None:
+        return dict(state)
+    projected: dict[str, object] = {}
+    for path_text in policy.include:
+        path = split_path(path_text)
+        found, value = get_path(state, path)
+        if found:
+            set_path(projected, path, value)
+    return projected
+
+
 __all__ = [
     "COMPACT_OBSERVATION",
     "STRICT_OBSERVATION",
@@ -132,4 +149,5 @@ __all__ = [
     "observe_payload",
     "project_input",
     "project_output",
+    "project_state",
 ]

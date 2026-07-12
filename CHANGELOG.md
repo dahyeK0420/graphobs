@@ -4,35 +4,39 @@ All notable changes to this project will be documented in this file.
 
 This project follows Semantic Versioning once public releases begin.
 
-## 0.3.2 - 2026-07-12
+## 0.4.0 - 2026-07-12
 
-- Fold runtime read enforcement into `contracts/validation.py` beside write
-  validation (`enforce_undeclared_reads`) and remove the
-  `graphobs.langgraph.read_audit` module; reads and writes now share one shallow
-  entry over `contracts.conformance`.
-- Resolve each `NodeContractMode` to one complete execution plan (pass-through,
-  read tracking, read action, write action) in a single table, replacing a
-  lookup table plus a second derivation step that disagreed on whether strict
-  execution audits reads.
-- Give `ProjectionPolicy` sole ownership of its projection behavior and remove
-  the `project_state` free function; drop the redundant `ProjectionPolicyLike`
-  and `ContractProjection` structural protocols in favor of the concrete
-  `Contract` interface.
-- Define the correlation-conflict rule once as `reconcile_correlation` in
-  `logging/context.py`, shared by invoke-config assembly and per-event log
-  assembly, and consolidate the package-internal diagnostic logger to one
-  definition.
-- Have `GraphLogCallback` own lifecycle timing state and emission directly,
-  removing the `LifecycleLogEmitter` indirection while keeping payload assembly
-  as pure helpers in `logging/lifecycle.py`.
-- Derive the input-span projection once inside `instrument_contract_run` and
-  remove the duplicated `ContractRunSpec.span_input` field; correct the
-  `PayloadObservation` docs that overclaimed span and callback paths project
-  identically.
-- Remove the empty `graphobs._integrations` package and the last hand-rolled
-  dotted-path split, and record the intentional sync/async adapter duplication
-  as an architecture decision (ADR 0001).
-- No change to the package-root interface.
+- Breaking: `ProjectionPolicy` is now include-only. The `exclude` and `summarize`
+  constructor axes are removed; they were unused outside tests, and span payloads
+  are already kept compact by the default trace serializer. Declare boundaries as
+  dotted include paths (a plain tuple, or `ProjectionPolicy(include=...)`).
+- Breaking: the redundant `ContractProjection` and `ProjectionPolicyLike`
+  protocols are removed from `graphobs.contracts.projection`, and the now-orphaned
+  `delete_path` is removed from `graphobs.state.paths`. The overlapping
+  contract/policy protocols are consolidated to `Contract` and `PathPolicy`.
+- Breaking: the experimental contract-discovery subsystem is removed.
+  `graphobs.discovery` (`discover_contract`, `adiscover_contract`,
+  `assert_contract_matches`, `assert_contract_amatches`, `DiscoveredContract`,
+  and the drift helpers) had no runtime, package-root, or example caller. Design
+  node contracts directly and use `AUDIT` mode to surface a node's real boundary
+  from production traffic.
+- Breaking: the `graphobs.tracing` payload-serializer override is removed
+  (`PayloadSerializer`, `default_payload_serializer`, and the `serializer=`
+  parameter on the span helpers); no caller overrode it. Select payload shape
+  with `mode=` / `TracePayloadMode` — `TracePayloadMode.FULL` still records
+  complete payloads for controlled debugging.
+- Breaking: `LogContext.as_attributes` is removed; it was a pure alias of
+  `as_metadata`. Use `as_metadata()` for both invoke metadata and span attributes.
+- Internal: the contract execution lifecycle is flattened. The `ContractRunSpec`
+  dataclass and the `node_contract_run_spec` / `subgraph_contract_run_spec`
+  factories are removed from `graphobs.langgraph.execution` in favor of a single
+  parameterized `instrument_contract_run` / `instrument_contract_arun` pair.
+- Internal: single-purpose modules are folded into their shared homes.
+  `contracts/validation.py` (`validate_update`) and `langgraph/read_audit.py`
+  (`enforce_undeclared_reads`) move into `contracts/conformance.py`; the payload
+  mode/serialize policy from `_observability/payload_policy.py` merges into
+  `payloads.py`. The `_observability` and empty `_integrations` packages are
+  removed.
 
 ## 0.3.1 - 2026-07-12
 

@@ -5,7 +5,6 @@ import logging
 import pytest
 
 from graphobs.state.paths import (
-    delete_path,
     get_path,
     is_prefix,
     iter_update_paths,
@@ -64,17 +63,6 @@ def test_set_path_creates_nested_mappings() -> None:
     set_path(target, ("answer", "text"), "done")
 
     assert target == {"answer": {"text": "done"}}
-
-
-def test_delete_path_prunes_empty_parent_mappings() -> None:
-    target: dict[str, object] = {
-        "answer": {"text": "done"},
-        "request": {"text": "hello"},
-    }
-
-    assert delete_path(target, ("answer", "text")) is True
-    assert delete_path(target, ("missing",)) is False
-    assert target == {"request": {"text": "hello"}}
 
 
 def test_state_diff_reports_changed_after_state_paths_only() -> None:

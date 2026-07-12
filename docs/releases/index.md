@@ -2,7 +2,7 @@
 
 Release pages summarize public package milestones.
 
-- [0.3.2](v0.3.2.md)
+- [0.4.0](v0.4.0.md)
 - [0.3.1](v0.3.1.md)
 - [0.3.0](v0.3.0.md)
 - [0.2.1](v0.2.1.md)

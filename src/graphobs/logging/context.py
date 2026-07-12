@@ -2,19 +2,12 @@
 
 from __future__ import annotations
 
-import logging
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import TypeAlias
 
 CorrelationValue: TypeAlias = str | int | float | bool
 Metadata: TypeAlias = Mapping[str, object]
-
-# Package-internal diagnostic channel shared by the logging modules to report
-# their own failures (payload assembly, invoke-config build, event emit). This
-# is distinct from the event log channel (``EVENT_LOGGER_NAME``) that carries
-# lifecycle events. Intentionally not part of ``__all__``: it is internal.
-INTERNAL_LOGGER = logging.getLogger("graphobs.logging")
 
 
 @dataclass(frozen=True, init=False)
@@ -121,20 +114,6 @@ class LogContext:
         """
         return self.as_mapping(fields)
 
-    def as_attributes(
-        self,
-        fields: CorrelationFields | None = None,
-    ) -> dict[str, object]:
-        """Returns correlation values suitable for span attributes.
-
-        Args:
-            fields: Optional field-name configuration.
-
-        Returns:
-            Flat attributes using the same field names as structured logs.
-        """
-        return self.as_mapping(fields)
-
     def as_mapping(self, fields: CorrelationFields | None = None) -> dict[str, object]:
         """Returns non-empty correlation values with configured field names.
 
@@ -166,43 +145,6 @@ def field_names(fields: CorrelationFields) -> tuple[str, ...]:
     )
 
 
-def reconcile_correlation(
-    base: Mapping[str, object],
-    overlay: Mapping[str, object],
-) -> dict[str, object]:
-    """Merges two sources of correlation values, rejecting conflicts.
-
-    A correlation field may be set by both a ``LogContext`` and invoke
-    metadata. Setting the same field to two different non-empty values is a
-    caller error and raises; ``None`` overlay values are ignored. This is the
-    single rule shared by invoke-config assembly (a ``LogContext`` overlaid on
-    caller metadata) and per-event log assembly (event metadata overlaid on a
-    ``LogContext``); callers add their own failure context.
-
-    Args:
-        base: Correlation values to start from.
-        overlay: Correlation values to merge in, ignoring ``None`` values.
-
-    Returns:
-        The merged correlation values.
-
-    Raises:
-        ValueError: If ``base`` and ``overlay`` set one field to different
-            non-empty values.
-    """
-    merged = dict(base)
-    for key, value in overlay.items():
-        if value is None:
-            continue
-        existing = merged.get(key)
-        if existing is not None and existing != value:
-            raise ValueError(
-                f"metadata correlation field {key!r} conflicts with LogContext"
-            )
-        merged[key] = value
-    return merged
-
-
 def _validate_field_name(value: str, label: str) -> str:
     if not value.strip():
         raise ValueError(f"{label} correlation field name must not be blank")
@@ -226,5 +168,4 @@ __all__ = [
     "LogContext",
     "Metadata",
     "field_names",
-    "reconcile_correlation",
 ]

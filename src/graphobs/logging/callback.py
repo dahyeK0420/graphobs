@@ -7,7 +7,6 @@ from collections.abc import Mapping, Sequence
 from time import perf_counter_ns
 
 from graphobs.logging.context import (
-    INTERNAL_LOGGER,
     CorrelationFields,
     LogContext,
     Metadata,
@@ -15,6 +14,7 @@ from graphobs.logging.context import (
 from graphobs.logging.lifecycle import (
     DEFAULT_ERROR_MESSAGE_MAX_LENGTH,
     EVENT_LOGGER_NAME,
+    INTERNAL_LOGGER,
     build_error_payload,
     build_finish_payload,
     build_start_payload,

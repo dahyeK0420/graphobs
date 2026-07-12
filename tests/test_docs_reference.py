@@ -10,17 +10,12 @@ EXPECTED_REFERENCE_TARGETS = {
     "contracts.md": (
         "graphobs.contracts.models",
         "graphobs.contracts.projection",
-        "graphobs.contracts.validation",
+        "graphobs.contracts.conformance",
         "graphobs.state.paths",
     ),
     "demo.md": (
         "graphobs.demo.tracing_setup",
         "graphobs.demo.span_records",
-    ),
-    "discovery.md": (
-        "graphobs.discovery.draft",
-        "graphobs.discovery.runner",
-        "graphobs.discovery.drift",
     ),
     "langgraph.md": (
         "graphobs.langgraph.nodes",

@@ -7,12 +7,11 @@ from typing import TypedDict
 
 from graphobs.logging.callback import GraphLogCallback
 from graphobs.logging.context import (
-    INTERNAL_LOGGER,
     CorrelationFields,
     LogContext,
     Metadata,
-    reconcile_correlation,
 )
+from graphobs.logging.lifecycle import reject_correlation_conflict
 
 
 class InvokeConfig(TypedDict):
@@ -59,11 +58,16 @@ def merge_metadata(
     metadata: Metadata,
 ) -> dict[str, object]:
     """Merges invoke metadata with correlation fields from the log context."""
-    try:
-        return reconcile_correlation(dict(metadata), log_context.as_metadata(fields))
-    except ValueError as error:
-        INTERNAL_LOGGER.error("Failed to build invoke config: %s", error)
-        raise
+    merged = dict(metadata)
+    for key, value in log_context.as_metadata(fields).items():
+        reject_correlation_conflict(
+            key,
+            merged.get(key),
+            value,
+            failure_context="Failed to build invoke config",
+        )
+        merged[key] = value
+    return merged
 
 
 __all__ = ["InvokeConfig", "build_invoke_config"]

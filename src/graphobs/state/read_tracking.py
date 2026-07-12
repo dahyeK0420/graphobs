@@ -1,4 +1,4 @@
-"""Shared mapping read tracking for discovery and runtime audits."""
+"""Shared mapping read tracking for runtime read audits."""
 
 from __future__ import annotations
 
@@ -43,23 +43,19 @@ class ReadTrackingMapping(Mapping[str, object]):
         self._prefix = prefix
 
     def __getitem__(self, key: str) -> object:
-        """Returns the value at ``key``, recording the read; nested maps are wrapped."""
         path = (*self._prefix, str(key))
         self._tracker.record(path)
         return self._wrap_value(path, self._source[key])
 
     def __iter__(self) -> Iterator[str]:
-        """Iterates the keys, recording every immediate child as read."""
         self._tracker.record_children(self._prefix, self._source)
         return iter(self._source)
 
     def __len__(self) -> int:
-        """Returns the entry count, recording every immediate child as read."""
         self._tracker.record_children(self._prefix, self._source)
         return len(self._source)
 
     def __contains__(self, key: object) -> bool:
-        """Tests membership, recording ``key`` as an attempted read."""
         path = (*self._prefix, str(key))
         self._tracker.record(path)
         return key in self._source
@@ -73,17 +69,14 @@ class ReadTrackingMapping(Mapping[str, object]):
         return self._wrap_value(path, self._source[key])
 
     def keys(self) -> KeysView[str]:
-        """Returns the keys view, recording every immediate child as read."""
         self._tracker.record_children(self._prefix, self._source)
         return super().keys()
 
     def items(self) -> ItemsView[str, object]:
-        """Returns the items view, recording every immediate child as read."""
         self._tracker.record_children(self._prefix, self._source)
         return super().items()
 
     def values(self) -> ValuesView[object]:
-        """Returns the values view, recording every immediate child as read."""
         self._tracker.record_children(self._prefix, self._source)
         return super().values()
 
