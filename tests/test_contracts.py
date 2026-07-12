@@ -20,9 +20,11 @@ from graphobs.contracts.projection import (
     project_output,
 )
 from graphobs.contracts.validation import (
+    enforce_undeclared_reads,
     validate_update,
 )
 from graphobs.state.paths import state_diff
+from graphobs.state.read_tracking import ReadTracker
 
 
 def test_node_contract_exposes_contract_interface() -> None:
@@ -234,6 +236,45 @@ def test_validate_update_can_warn_and_continue(
 
     assert caplog.records[0].levelno == logging.WARNING
     assert caplog.messages == [str(expected_error)]
+
+
+def test_enforce_undeclared_reads_ignores_missing_tracker() -> None:
+    contract = NodeContract(name="audited", reads=("request.text",), writes=())
+
+    enforce_undeclared_reads(contract, None)
+
+
+def test_enforce_undeclared_reads_raises_by_default() -> None:
+    contract = NodeContract(name="audited", reads=("request.text",), writes=())
+    tracker = ReadTracker()
+    tracker.record(("context", "extra"))
+    tracker.record(("request", "raw"))
+
+    with pytest.raises(StateContractError) as error:
+        enforce_undeclared_reads(contract, tracker)
+
+    assert error.value.access == "read"
+    assert error.value.undeclared_paths == ("context.extra", "request.raw")
+
+
+def test_enforce_undeclared_reads_warns_and_continues(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    caplog.set_level(logging.WARNING, logger="graphobs.contracts")
+    contract = NodeContract(name="audited", reads=("request.text",), writes=())
+    tracker = ReadTracker()
+    tracker.record(("context", "extra"))
+    tracker.record(("request", "raw"))
+
+    enforce_undeclared_reads(
+        contract,
+        tracker,
+        on_violation=ContractViolationAction.WARN,
+    )
+
+    assert caplog.messages == [
+        "Contract 'audited' read undeclared state paths: context.extra, request.raw"
+    ]
 
 
 def test_projection_policy_excludes_and_summarizes_nested_state() -> None:

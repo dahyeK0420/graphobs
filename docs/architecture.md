@@ -19,7 +19,7 @@ flowchart TD
 
     %% ---------- Integration (optional, runtime-coupled) ----------
     subgraph integration["Integration layers — optional, runtime-coupled"]
-        lg["langgraph/<br/>node and subgraph wrappers<br/>nodes · subgraphs · execution<br/>callbacks (projection) · read_audit · schemas"]
+        lg["langgraph/<br/>node and subgraph wrappers<br/>nodes · subgraphs · execution<br/>callbacks (projection) · schemas"]
         tracing["tracing.py<br/>graph span helpers · error marking<br/>compact / full payloads<br/>PayloadSerializer protocol"]
         logging["logging/<br/>structured lifecycle logs<br/>GraphLogCallback · LogContext<br/>CorrelationFields · build_invoke_config"]
     end
@@ -117,7 +117,6 @@ src/graphobs/
     callbacks.py
     execution.py
     nodes.py
-    read_audit.py
     schemas.py
     subgraphs.py
   _observability/

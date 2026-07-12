@@ -27,7 +27,7 @@ from graphobs import payloads, tracing
 
 
 def test_package_imports() -> None:
-    assert graphobs.__version__ == "0.3.1"
+    assert graphobs.__version__ == "0.3.2"
 
 
 @pytest.mark.parametrize(
@@ -103,16 +103,13 @@ def test_package_root_exports_headline_interface_only() -> None:
             [
                 "COMPACT_OBSERVATION",
                 "STRICT_OBSERVATION",
-                "ContractProjection",
                 "PayloadObservation",
-                "ProjectionPolicyLike",
                 "observe_payload",
                 "project_input",
                 "project_output",
-                "project_state",
             ],
         ),
-        (validation, ["validate_update"]),
+        (validation, ["enforce_undeclared_reads", "validate_update"]),
         (
             paths,
             [
@@ -166,6 +163,7 @@ def test_package_root_exports_headline_interface_only() -> None:
                 "LogContext",
                 "Metadata",
                 "field_names",
+                "reconcile_correlation",
             ],
         ),
         (callback, ["GraphLogCallback"]),

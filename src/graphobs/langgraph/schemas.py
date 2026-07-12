@@ -7,6 +7,7 @@ import typing
 from typing import Protocol, cast
 
 from graphobs.contracts.models import Contract, ProjectionPolicy
+from graphobs.state.paths import split_path
 
 LOGGER = logging.getLogger("graphobs.langgraph")
 
@@ -55,7 +56,7 @@ def _top_level_fields(
         if policy.include is None:
             raise ValueError("open-ended projection cannot be represented")
         for path_text in policy.include:
-            key = path_text.split(".", maxsplit=1)[0]
+            key = split_path(path_text)[0]
             fields[key] = object
     return fields
 

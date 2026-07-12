@@ -5,32 +5,24 @@ from typing import cast
 
 import pytest
 
-from graphobs.logging.context import (
-    CorrelationFields,
-    LogContext,
-)
-from graphobs.logging.lifecycle import (
-    EVENT_LOGGER_NAME,
-    LifecycleLogEmitter,
-)
+from graphobs.logging.callback import GraphLogCallback
+from graphobs.logging.context import LogContext
+from graphobs.logging.lifecycle import EVENT_LOGGER_NAME
 
 LARGE_VALUE = "do not store this full lifecycle value " * 20
 
 
-def test_lifecycle_emitter_logs_start_finish_and_error_payloads(
+def test_callback_logs_start_finish_and_error_payloads(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     caplog.set_level(logging.INFO, logger=EVENT_LOGGER_NAME)
-    emitter = LifecycleLogEmitter(
+    callback = GraphLogCallback(
         LogContext(session_id="session-1"),
-        CorrelationFields(),
-        logging.getLogger(EVENT_LOGGER_NAME),
+        logger=logging.getLogger(EVENT_LOGGER_NAME),
         error_message_max_length=32,
     )
 
-    emitter.start(
-        "chain_start",
-        "chain",
+    callback.on_chain_start(
         {"name": "answer"},
         {"request": {"text": LARGE_VALUE}},
         run_id="run-1",
@@ -38,26 +30,21 @@ def test_lifecycle_emitter_logs_start_finish_and_error_payloads(
         tags=("contracted",),
         metadata={"request_id": "request-1"},
     )
-    emitter.finish(
-        "chain_end",
-        "chain",
+    callback.on_chain_end(
         {"answer": {"text": LARGE_VALUE}},
         run_id="run-1",
         parent_run_id=None,
     )
-    emitter.start(
-        "tool_start",
-        "tool",
+    callback.on_tool_start(
         {"name": "lookup"},
-        {"query": LARGE_VALUE},
+        "",
         run_id="run-2",
         parent_run_id="run-1",
         tags=None,
         metadata={},
+        inputs={"query": LARGE_VALUE},
     )
-    emitter.error(
-        "tool_error",
-        "tool",
+    callback.on_tool_error(
         RuntimeError(LARGE_VALUE),
         run_id="run-2",
         parent_run_id="run-1",
@@ -84,19 +71,16 @@ def test_lifecycle_emitter_logs_start_finish_and_error_payloads(
     assert LARGE_VALUE not in caplog.text
 
 
-def test_lifecycle_emitter_warns_when_duration_is_missing(
+def test_callback_warns_when_duration_is_missing(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     caplog.set_level(logging.INFO, logger=EVENT_LOGGER_NAME)
-    emitter = LifecycleLogEmitter(
+    callback = GraphLogCallback(
         LogContext(),
-        CorrelationFields(),
-        logging.getLogger(EVENT_LOGGER_NAME),
+        logger=logging.getLogger(EVENT_LOGGER_NAME),
     )
 
-    emitter.finish(
-        "chain_end",
-        "chain",
+    callback.on_chain_end(
         {"answer": "ok"},
         run_id="missing-run",
         parent_run_id=None,
@@ -113,21 +97,18 @@ def test_lifecycle_emitter_warns_when_duration_is_missing(
     assert caplog.records[0].levelno == logging.WARNING
 
 
-def test_lifecycle_emitter_logs_correlation_conflicts(
+def test_callback_logs_correlation_conflicts(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     caplog.set_level(logging.ERROR, logger="graphobs.logging")
-    emitter = LifecycleLogEmitter(
+    callback = GraphLogCallback(
         LogContext(session_id="session-1"),
-        CorrelationFields(),
-        logging.getLogger(EVENT_LOGGER_NAME),
+        logger=logging.getLogger(EVENT_LOGGER_NAME),
     )
     expected_error = "metadata correlation field 'session_id' conflicts with LogContext"
 
     with pytest.raises(ValueError, match=expected_error):
-        emitter.start(
-            "chain_start",
-            "chain",
+        callback.on_chain_start(
             {"name": "conflict"},
             {},
             run_id="conflict-run",
@@ -139,7 +120,7 @@ def test_lifecycle_emitter_logs_correlation_conflicts(
     assert caplog.messages == [f"Failed to build graph log payload: {expected_error}"]
 
 
-def test_lifecycle_emitter_logger_failure_logs_error_and_raises(
+def test_callback_logger_failure_logs_error_and_raises(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     caplog.set_level(logging.ERROR, logger="graphobs.logging")
@@ -148,12 +129,10 @@ def test_lifecycle_emitter_logger_failure_logs_error_and_raises(
     logger.propagate = False
     logger.setLevel(logging.INFO)
     logger.addHandler(_FailingHandler())
-    emitter = LifecycleLogEmitter(LogContext(), CorrelationFields(), logger)
+    callback = GraphLogCallback(LogContext(), logger=logger)
 
     with pytest.raises(RuntimeError, match="export unavailable"):
-        emitter.start(
-            "chain_start",
-            "chain",
+        callback.on_chain_start(
             {"name": "fail"},
             {},
             run_id="run-1",
