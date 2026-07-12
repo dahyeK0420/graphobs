@@ -2,18 +2,17 @@
 
 from __future__ import annotations
 
-import logging as stdlib_logging
 from collections.abc import Sequence
 from typing import TypedDict
 
 from graphobs.logging.callback import GraphLogCallback
 from graphobs.logging.context import (
+    INTERNAL_LOGGER,
     CorrelationFields,
     LogContext,
     Metadata,
+    reconcile_correlation,
 )
-
-INTERNAL_LOGGER = stdlib_logging.getLogger("graphobs.logging")
 
 
 class InvokeConfig(TypedDict):
@@ -60,17 +59,11 @@ def merge_metadata(
     metadata: Metadata,
 ) -> dict[str, object]:
     """Merges invoke metadata with correlation fields from the log context."""
-    merged = dict(metadata)
-    for key, value in log_context.as_metadata(fields).items():
-        existing = merged.get(key)
-        if existing is not None and existing != value:
-            error = ValueError(
-                f"metadata correlation field {key!r} conflicts with LogContext"
-            )
-            INTERNAL_LOGGER.error("Failed to build invoke config: %s", error)
-            raise error
-        merged[key] = value
-    return merged
+    try:
+        return reconcile_correlation(dict(metadata), log_context.as_metadata(fields))
+    except ValueError as error:
+        INTERNAL_LOGGER.error("Failed to build invoke config: %s", error)
+        raise
 
 
 __all__ = ["InvokeConfig", "build_invoke_config"]

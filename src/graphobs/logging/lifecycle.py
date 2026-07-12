@@ -1,158 +1,28 @@
-"""Lifecycle log assembly and emission for structured graph logs."""
+"""Payload assembly helpers for structured graph lifecycle logs.
+
+These functions build the structured log payloads a graph lifecycle event
+records. They are pure: they hold no state and emit nothing. The stateful owner
+that times runs, calls them, and emits the result is
+``graphobs.logging.callback.GraphLogCallback``.
+"""
 
 from __future__ import annotations
 
-import logging as stdlib_logging
 from collections.abc import Mapping, Sequence
-from time import perf_counter_ns
 
 from graphobs._observability.payload_policy import payload_summary
 from graphobs.logging.context import (
+    INTERNAL_LOGGER,
     CorrelationFields,
     LogContext,
     Metadata,
     field_names,
+    reconcile_correlation,
 )
 
 DEFAULT_ERROR_MESSAGE_MAX_LENGTH = 512
 EVENT_LOGGER_NAME = "graphobs.logs"
-INTERNAL_LOGGER = stdlib_logging.getLogger("graphobs.logging")
 NS_PER_MS = 1_000_000
-
-
-class LifecycleLogEmitter:
-    """Owns structured graph lifecycle log state, payloads, and emission."""
-
-    def __init__(
-        self,
-        log_context: LogContext,
-        fields: CorrelationFields,
-        logger: stdlib_logging.Logger,
-        *,
-        error_message_max_length: int = DEFAULT_ERROR_MESSAGE_MAX_LENGTH,
-    ) -> None:
-        if error_message_max_length < 4:
-            raise ValueError("error_message_max_length must be at least 4")
-        self.log_context = log_context
-        self.fields = fields
-        self.logger = logger
-        self.error_message_max_length = error_message_max_length
-        self._started_at_ns: dict[str, int] = {}
-        self._metadata_by_run: dict[str, dict[str, object]] = {}
-
-    def start(
-        self,
-        event: str,
-        run_kind: str,
-        serialized: Mapping[str, object] | None,
-        value: object,
-        *,
-        run_id: object,
-        parent_run_id: object | None,
-        tags: Sequence[str] | None,
-        metadata: Metadata | None,
-    ) -> None:
-        run_id_text = stringify_id(run_id)
-        metadata_values = dict(metadata or {})
-        self._started_at_ns[run_id_text] = perf_counter_ns()
-        self._metadata_by_run[run_id_text] = metadata_values
-        payload = build_start_payload(
-            self.log_context,
-            self.fields,
-            event,
-            run_kind,
-            serialized,
-            value,
-            run_id=run_id,
-            parent_run_id=parent_run_id,
-            tags=tags,
-            metadata=metadata_values,
-        )
-        self._emit(stdlib_logging.INFO, payload)
-
-    def finish(
-        self,
-        event: str,
-        run_kind: str,
-        value: object,
-        *,
-        run_id: object,
-        parent_run_id: object | None,
-    ) -> None:
-        run_id_text = stringify_id(run_id)
-        metadata = self._metadata_by_run.pop(run_id_text, {})
-        payload = build_finish_payload(
-            self.log_context,
-            self.fields,
-            event,
-            run_kind,
-            value,
-            run_id=run_id,
-            parent_run_id=parent_run_id,
-            metadata=metadata,
-            duration_ms=self._duration_ms(run_id_text, event, run_kind),
-        )
-        self._emit(stdlib_logging.INFO, payload)
-
-    def error(
-        self,
-        event: str,
-        run_kind: str,
-        error: BaseException,
-        *,
-        run_id: object,
-        parent_run_id: object | None,
-    ) -> None:
-        run_id_text = stringify_id(run_id)
-        metadata = self._metadata_by_run.pop(run_id_text, {})
-        payload = build_error_payload(
-            self.log_context,
-            self.fields,
-            event,
-            run_kind,
-            error,
-            run_id=run_id,
-            parent_run_id=parent_run_id,
-            metadata=metadata,
-            duration_ms=self._duration_ms(run_id_text, event, run_kind),
-            error_message_max_length=self.error_message_max_length,
-        )
-        self._emit(stdlib_logging.ERROR, payload)
-
-    def _duration_ms(
-        self,
-        run_id: str,
-        event: str,
-        run_kind: str,
-    ) -> float | None:
-        started_at_ns = self._started_at_ns.pop(run_id, None)
-        if started_at_ns is None:
-            self._emit(
-                stdlib_logging.WARNING,
-                duration_missing_payload(run_id, event, run_kind),
-            )
-            return None
-        return elapsed_duration_ms(started_at_ns, perf_counter_ns())
-
-    def _emit(self, level: int, payload: Mapping[str, object]) -> None:
-        event = str(payload.get("event", "unknown"))
-        detail = payload.get("warning")
-        message = (
-            "graph lifecycle event: %s"
-            if detail is None
-            else "graph lifecycle event: %s: %s"
-        )
-        args = (event,) if detail is None else (event, detail)
-        try:
-            self.logger.log(
-                level,
-                message,
-                *args,
-                extra={"graph_log": dict(payload), "graph_log_event": event},
-            )
-        except Exception as exc:
-            INTERNAL_LOGGER.error("Failed to emit graph log event %s: %s", event, exc)
-            raise
 
 
 def build_start_payload(
@@ -168,6 +38,11 @@ def build_start_payload(
     tags: Sequence[str] | None,
     metadata: Metadata,
 ) -> dict[str, object]:
+    """Builds the structured payload for a run-start event.
+
+    Extends the common base payload with the resolved run name, tags, and a
+    projected summary of the run's input value.
+    """
     payload = base_payload(
         log_context,
         fields,
@@ -199,6 +74,11 @@ def build_finish_payload(
     metadata: Metadata,
     duration_ms: float | None,
 ) -> dict[str, object]:
+    """Builds the structured payload for a run-finish event.
+
+    Extends the common base payload with the elapsed ``duration_ms`` and a
+    projected summary of the run's output value.
+    """
     payload = base_payload(
         log_context,
         fields,
@@ -226,6 +106,12 @@ def build_error_payload(
     duration_ms: float | None,
     error_message_max_length: int,
 ) -> dict[str, object]:
+    """Builds the structured payload for a run-error event.
+
+    Extends the common base payload with the elapsed ``duration_ms``, the
+    error's type name, and its message truncated to
+    ``error_message_max_length`` (with a flag recording whether it was cut).
+    """
     error_message, truncated = truncate_error_message(
         str(error),
         error_message_max_length,
@@ -260,6 +146,12 @@ def base_payload(
     parent_run_id: object | None,
     metadata: Metadata,
 ) -> dict[str, object]:
+    """Builds the fields shared by every lifecycle event.
+
+    Emits the event name, run kind, stringified run and parent-run ids, the
+    sorted metadata keys, and the correlation fields reconciled from the log
+    context and metadata overlay.
+    """
     correlation = merge_correlation(
         log_context,
         fields,
@@ -283,6 +175,11 @@ def duration_missing_payload(
     event: str,
     run_kind: str,
 ) -> dict[str, object]:
+    """Builds a warning payload for a finish event with no recorded start time.
+
+    Emitted in place of a duration when the matching start event was never
+    seen, so no elapsed time can be computed.
+    """
     warning = f"missing start time for run_id {run_id}"
     return {
         "event": "duration_missing",
@@ -294,6 +191,10 @@ def duration_missing_payload(
 
 
 def elapsed_duration_ms(started_at_ns: int, finished_at_ns: int) -> float:
+    """Returns the elapsed milliseconds between two nanosecond timestamps.
+
+    Rounded to three decimal places (microsecond resolution).
+    """
     return round((finished_at_ns - started_at_ns) / NS_PER_MS, 3)
 
 
@@ -302,23 +203,25 @@ def merge_correlation(
     fields: CorrelationFields,
     metadata: Metadata,
 ) -> dict[str, object]:
-    correlation = log_context.as_mapping(fields)
-    for key in field_names(fields):
-        metadata_value = metadata.get(key)
-        if metadata_value is None:
-            continue
-        existing = correlation.get(key)
-        if existing is not None and existing != metadata_value:
-            error = ValueError(
-                f"metadata correlation field {key!r} conflicts with LogContext"
-            )
-            INTERNAL_LOGGER.error("Failed to build graph log payload: %s", error)
-            raise error
-        correlation[key] = metadata_value
-    return correlation
+    """Reconciles correlation fields from the log context and run metadata.
+
+    Metadata values for known correlation field names overlay the log
+    context's values.
+
+    Raises:
+        ValueError: If the context and metadata disagree on a field. The
+            conflict is logged before the error propagates.
+    """
+    overlay = {name: metadata[name] for name in field_names(fields) if name in metadata}
+    try:
+        return reconcile_correlation(log_context.as_mapping(fields), overlay)
+    except ValueError as error:
+        INTERNAL_LOGGER.error("Failed to build graph log payload: %s", error)
+        raise
 
 
 def stringify_id(value: object) -> str:
+    """Returns the string form of a run identifier."""
     return str(value)
 
 
@@ -326,6 +229,11 @@ def run_name(
     serialized: Mapping[str, object] | None,
     metadata: Metadata,
 ) -> str | None:
+    """Derives a human-readable run name.
+
+    Prefers the ``langgraph_node`` then ``name`` metadata keys, falling back to
+    the serialized payload's ``name``. Returns ``None`` when none is present.
+    """
     for key in ("langgraph_node", "name"):
         value = metadata.get(key)
         if value is not None:
@@ -337,6 +245,11 @@ def run_name(
 
 
 def truncate_error_message(message: str, max_length: int) -> tuple[str, bool]:
+    """Truncates a message to ``max_length``, reporting whether it was cut.
+
+    When truncation is needed the returned message ends in an ellipsis and its
+    length still respects ``max_length``. Returns ``(message, was_truncated)``.
+    """
     if len(message) <= max_length:
         return message, False
     return f"{message[: max_length - 3]}...", True

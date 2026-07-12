@@ -28,18 +28,23 @@ ExecutionInputBuilder = Callable[[StateMapping], StateMapping]
 ExecutionStep = Callable[[StateMapping], StateMapping]
 AsyncExecutionStep = Callable[[StateMapping], Awaitable[StateMapping]]
 UpdateBuilder = Callable[[StateMapping, StateMapping], StateUpdate]
-SpanPayloadBuilder = Callable[[StateMapping], dict[str, object]]
 
 
 @dataclass(frozen=True)
 class ContractRunSpec:
-    """Describes one contract-bound execution lifecycle."""
+    """Describes one contract-bound execution lifecycle.
+
+    Each field is supplied per adapter by its run-spec builder (node or
+    subgraph). The public input span payload is deliberately not a field: it is
+    the same strict projection of the contract's input for every adapter, so
+    ``instrument_contract_run`` derives it directly from ``contract`` rather
+    than having each builder pass an identical callable.
+    """
 
     contract: Contract
     span_kind: str
     attributes: Mapping[str, object]
     execution_input: ExecutionInputBuilder
-    span_input: SpanPayloadBuilder
     validation_update: UpdateBuilder
     public_output: UpdateBuilder
     return_value: UpdateBuilder | None
@@ -61,7 +66,7 @@ def instrument_contract_run(
         attributes=spec.attributes,
     ) as span:
         try:
-            set_span_input(span, spec.span_input(state))
+            set_span_input(span, _observe_input(spec.contract, state))
             run_input = spec.execution_input(state)
             run_result = execute(run_input)
             validate_update(
@@ -98,7 +103,7 @@ async def instrument_contract_arun(
         attributes=spec.attributes,
     ) as span:
         try:
-            set_span_input(span, spec.span_input(state))
+            set_span_input(span, _observe_input(spec.contract, state))
             run_input = spec.execution_input(state)
             run_result = await execute(run_input)
             validate_update(
@@ -122,6 +127,15 @@ async def instrument_contract_arun(
             raise
 
 
+def _observe_input(contract: Contract, state: StateMapping) -> dict[str, object]:
+    """Projects a contract's public input payload for the span.
+
+    The same strict input projection is used for both node and subgraph spans,
+    so it lives here rather than being rebuilt in each run-spec builder.
+    """
+    return observe_payload(contract, state, "input", observation=STRICT_OBSERVATION)
+
+
 def node_contract_run_spec(
     contract: Contract,
     *,
@@ -137,12 +151,6 @@ def node_contract_run_spec(
         span_kind=span_kind,
         attributes=attributes,
         execution_input=execution_input,
-        span_input=lambda raw_state: observe_payload(
-            contract,
-            raw_state,
-            "input",
-            observation=STRICT_OBSERVATION,
-        ),
         validation_update=lambda _run_input, update: update,
         public_output=lambda _run_input, update: observe_payload(
             contract,
@@ -171,12 +179,6 @@ def subgraph_contract_run_spec(
         span_kind=span_kind,
         attributes=attributes,
         execution_input=lambda raw_state: build_execution_input(contract, raw_state),
-        span_input=lambda raw_state: observe_payload(
-            contract,
-            raw_state,
-            "input",
-            observation=STRICT_OBSERVATION,
-        ),
         validation_update=state_diff,
         public_output=lambda subgraph_input, after_state: project_output(
             contract,

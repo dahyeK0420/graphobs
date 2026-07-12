@@ -8,11 +8,15 @@ from enum import StrEnum
 from types import MappingProxyType
 from typing import Literal, Protocol, TypeAlias
 
-from graphobs.contracts.projection import project_state
+from graphobs._observability.payload_policy import payload_summary
 from graphobs.state.paths import (
     StateMapping,
+    delete_path,
+    get_path,
     normalize_optional_paths,
     normalize_paths,
+    set_path,
+    split_path,
 )
 
 AttributeValue = str | int | float | bool | None
@@ -97,13 +101,36 @@ class ProjectionPolicy:
     def project(self, state: StateMapping) -> dict[str, object]:
         """Projects state according to this policy.
 
+        Applies the policy in order: select ``include`` paths (or all state when
+        ``include`` is ``None``), remove ``exclude`` paths, then replace
+        ``summarize`` paths with a compact shape summary.
+
         Args:
             state: Mapping of graph state keys to values.
 
         Returns:
             A new dictionary containing only the selected public state.
         """
-        return project_state(self, state)
+        if self.include is None:
+            projected: dict[str, object] = dict(state)
+        else:
+            projected = {}
+            for path_text in self.include:
+                path = split_path(path_text)
+                found, value = get_path(state, path)
+                if found:
+                    set_path(projected, path, value)
+
+        for path_text in self.exclude:
+            delete_path(projected, split_path(path_text))
+
+        for path_text in self.summarize:
+            path = split_path(path_text)
+            found, value = get_path(projected, path)
+            if found:
+                set_path(projected, path, payload_summary(value))
+
+        return projected
 
 
 ProjectionSpec: TypeAlias = ProjectionPolicy | Iterable[str]

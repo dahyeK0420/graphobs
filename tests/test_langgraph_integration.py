@@ -28,6 +28,7 @@ from graphobs.contracts.models import (
     SubgraphContract,
 )
 from graphobs.langgraph.execution import (
+    instrument_contract_arun,
     instrument_contract_run,
     node_contract_run_spec,
     subgraph_contract_run_spec,
@@ -526,6 +527,90 @@ def test_subgraph_contract_run_spec_returns_projected_parent_output(
     assert json.loads(output_value) == {
         "answer": {"text": {"type": "str", "length": 4}},
     }
+
+
+def test_node_contract_arun_spec_projects_span_input_and_output(
+    span_exporter: InMemorySpanExporter,
+) -> None:
+    contract = NodeContract(
+        name="aspec_classify",
+        reads=("request.text",),
+        writes=("classification.label",),
+    )
+    spec = node_contract_run_spec(
+        contract,
+        span_kind="CHAIN",
+        attributes={"graph.node": contract.label},
+        execution_input=lambda state: {"request": state["request"]},
+        on_violation=ContractViolationAction.RAISE,
+        logger=logging.getLogger("graphobs.langgraph"),
+    )
+
+    async def execute(_run_input: Mapping[str, object]) -> dict[str, object]:
+        return {"classification": {"label": "greeting"}}
+
+    result = asyncio.run(
+        instrument_contract_arun(
+            spec,
+            {"request": {"text": "hello", "raw": "hidden"}},
+            execute=execute,
+        )
+    )
+
+    assert result == {"classification": {"label": "greeting"}}
+    span = span_exporter.get_finished_spans()[0]
+    assert span.attributes is not None
+    input_value = span.attributes[SpanAttributes.INPUT_VALUE]
+    output_value = span.attributes[SpanAttributes.OUTPUT_VALUE]
+    assert isinstance(input_value, str)
+    assert isinstance(output_value, str)
+    # Undeclared "request.raw" is projected out of the observed input span.
+    assert json.loads(input_value) == {
+        "request": {"text": {"type": "str", "length": 5}},
+    }
+    assert json.loads(output_value) == {
+        "classification": {"label": {"type": "str", "length": 8}},
+    }
+
+
+def test_node_and_subgraph_share_one_input_span_projection(
+    span_exporter: InMemorySpanExporter,
+) -> None:
+    state = {"request": {"text": "hello", "raw": "hidden"}}
+    node_spec = node_contract_run_spec(
+        NodeContract(name="parity_node", reads=("request.text",)),
+        span_kind="CHAIN",
+        attributes={},
+        execution_input=lambda run_state: run_state,
+        on_violation=ContractViolationAction.WARN,
+        logger=logging.getLogger("graphobs.langgraph"),
+    )
+    subgraph_spec = subgraph_contract_run_spec(
+        SubgraphContract(
+            parent_input=("request.text",),
+            owner_namespace="parity_subgraph",
+        ),
+        span_kind="CHAIN",
+        attributes={},
+        on_violation=ContractViolationAction.WARN,
+        logger=logging.getLogger("graphobs.langgraph"),
+    )
+
+    instrument_contract_run(node_spec, state, execute=lambda _run_input: {})
+    instrument_contract_run(
+        subgraph_spec,
+        state,
+        execute=lambda _run_input: {"request": {"text": "hello"}},
+    )
+
+    input_values = {
+        span.attributes[SpanAttributes.INPUT_VALUE]
+        for span in span_exporter.get_finished_spans()
+        if span.attributes is not None
+    }
+    # Both adapters observe input through the one shared strict projection, so
+    # the same state yields one identical input-span payload.
+    assert len(input_values) == 1
 
 
 def test_contract_node_invalid_call_logs_error(

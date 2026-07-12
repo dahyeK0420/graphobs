@@ -4,61 +4,17 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Literal, Protocol
+from typing import Literal
 
-from graphobs._observability.payload_policy import (
-    payload_summary,
-    project_contract_payload,
-)
-from graphobs.state.paths import (
-    StateMapping,
-    delete_path,
-    get_path,
-    set_path,
-    split_path,
-    state_diff,
-)
+from graphobs._observability.payload_policy import project_contract_payload
+from graphobs.contracts.models import Contract
+from graphobs.state.paths import StateMapping, state_diff
 
 LOGGER = logging.getLogger("graphobs.contracts")
 
 
-class ProjectionPolicyLike(Protocol):
-    """Minimal projection policy shape for projection helpers."""
-
-    @property
-    def include(self) -> tuple[str, ...] | None:
-        """Dotted paths included by the policy, or all paths when omitted."""
-
-    @property
-    def exclude(self) -> tuple[str, ...]:
-        """Dotted paths excluded by the policy."""
-
-    @property
-    def summarize(self) -> tuple[str, ...]:
-        """Dotted paths summarized by the policy."""
-
-    def project(self, state: StateMapping) -> dict[str, object]:
-        """Projects state through the policy."""
-
-
-class ContractProjection(Protocol):
-    """Minimal contract shape used by projection helpers."""
-
-    @property
-    def label(self) -> str:
-        """Human-readable contract label."""
-
-    @property
-    def input_policy(self) -> ProjectionPolicyLike:
-        """Public input projection policy."""
-
-    @property
-    def output_policy(self) -> ProjectionPolicyLike:
-        """Public output projection policy."""
-
-
 def project_input(
-    contract: ContractProjection,
+    contract: Contract,
     state: StateMapping,
 ) -> dict[str, object]:
     """Projects public input state for a node or subgraph contract.
@@ -74,7 +30,7 @@ def project_input(
 
 
 def project_output(
-    contract: ContractProjection,
+    contract: Contract,
     before_state: StateMapping,
     after_state: StateMapping,
 ) -> dict[str, object]:
@@ -98,10 +54,17 @@ def project_output(
 class PayloadObservation:
     """How an observed contract payload is projected for telemetry.
 
-    The span execution path and the callback projection path observe the same
-    node through different mechanisms; passing one of these explicitly to
-    ``observe_payload`` keeps the projection identical between them instead of
-    letting fallback and compaction diverge silently.
+    Controls the two knobs applied after a contract's projection policy runs. It
+    does not choose which policy is applied; it only decides what happens on a
+    projection failure and whether the projected payload is compacted in this
+    layer.
+
+    The two knobs exist because the span path and the callback path compact in
+    different places. The span path uses ``STRICT_OBSERVATION`` and leaves final
+    compaction to the tracing serializer (message-compact by default). The
+    callback path has no span to serialize, so it uses ``COMPACT_OBSERVATION``
+    to compact inline. Both routes reduce through the same
+    ``message_compact_summary`` helper, so they agree on shape.
 
     Attributes:
         fallback_to_summary: Whether a projection failure returns a compact
@@ -119,7 +82,7 @@ COMPACT_OBSERVATION = PayloadObservation(fallback_to_summary=True, compact=True)
 
 
 def observe_payload(
-    contract: ContractProjection,
+    contract: Contract,
     payload: StateMapping,
     kind: Literal["input", "output"],
     *,
@@ -162,41 +125,11 @@ def observe_payload(
     )
 
 
-def project_state(
-    policy: ProjectionPolicyLike,
-    state: StateMapping,
-) -> dict[str, object]:
-    """Projects state according to one projection policy."""
-    if policy.include is None:
-        projected: dict[str, object] = dict(state)
-    else:
-        projected = {}
-        for path_text in policy.include:
-            path = split_path(path_text)
-            found, value = get_path(state, path)
-            if found:
-                set_path(projected, path, value)
-
-    for path_text in policy.exclude:
-        delete_path(projected, split_path(path_text))
-
-    for path_text in policy.summarize:
-        path = split_path(path_text)
-        found, value = get_path(projected, path)
-        if found:
-            set_path(projected, path, payload_summary(value))
-
-    return projected
-
-
 __all__ = [
     "COMPACT_OBSERVATION",
     "STRICT_OBSERVATION",
-    "ContractProjection",
     "PayloadObservation",
-    "ProjectionPolicyLike",
     "observe_payload",
     "project_input",
     "project_output",
-    "project_state",
 ]

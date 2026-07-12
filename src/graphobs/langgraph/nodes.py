@@ -15,14 +15,14 @@ from graphobs.contracts.models import (
     ContractViolationAction,
     NodeContract,
 )
+from graphobs.contracts.validation import (
+    enforce_undeclared_reads,
+)
 from graphobs.langgraph.execution import (
     build_execution_input,
     instrument_contract_arun,
     instrument_contract_run,
     node_contract_run_spec,
-)
-from graphobs.langgraph.read_audit import (
-    enforce_undeclared_reads,
 )
 from graphobs.langgraph.schemas import (
     langgraph_input_schema,
@@ -65,28 +65,38 @@ class NodeContractMode(StrEnum):
 
 @dataclass(frozen=True)
 class _ModeExecution:
-    """Internal execution settings a ``NodeContractMode`` resolves to."""
+    """The complete execution settings one ``NodeContractMode`` resolves to.
+
+    Every field is stated directly for every mode in ``_MODE_EXECUTIONS`` —
+    nothing is derived in a second step — so this table is the single place
+    that describes what each mode does. ``read_violation`` is only consulted
+    when ``track_reads`` is set.
+    """
 
     pass_through_state: bool
-    audit_reads: bool
-    on_violation: ContractViolationAction
+    track_reads: bool
+    read_violation: ContractViolationAction
+    write_violation: ContractViolationAction
 
 
 _MODE_EXECUTIONS: dict[NodeContractMode, _ModeExecution] = {
     NodeContractMode.OBSERVE: _ModeExecution(
         pass_through_state=True,
-        audit_reads=False,
-        on_violation=ContractViolationAction.WARN,
+        track_reads=False,
+        read_violation=ContractViolationAction.WARN,
+        write_violation=ContractViolationAction.WARN,
     ),
     NodeContractMode.AUDIT: _ModeExecution(
         pass_through_state=True,
-        audit_reads=True,
-        on_violation=ContractViolationAction.WARN,
+        track_reads=True,
+        read_violation=ContractViolationAction.WARN,
+        write_violation=ContractViolationAction.WARN,
     ),
     NodeContractMode.ENFORCE: _ModeExecution(
         pass_through_state=False,
-        audit_reads=False,
-        on_violation=ContractViolationAction.RAISE,
+        track_reads=True,
+        read_violation=ContractViolationAction.RAISE,
+        write_violation=ContractViolationAction.RAISE,
     ),
 }
 
@@ -192,17 +202,18 @@ def _wrap_contract_node(
     *,
     execution: _ModeExecution,
 ) -> NodeWrapper:
-    track_reads, read_violation = _read_audit_plan(execution)
     if inspect.iscoroutinefunction(fn):
         async_fn = cast(AsyncNodeFunction, fn)
 
         @wraps(async_fn)
         async def async_wrapper(state: StateMapping, **kwargs: Any) -> StateUpdate:
-            tracker = ReadTracker() if track_reads else None
+            tracker = ReadTracker() if execution.track_reads else None
 
             async def execute(run_input: StateMapping) -> StateUpdate:
                 update = await async_fn(run_input, **kwargs)
-                enforce_undeclared_reads(contract, tracker, on_violation=read_violation)
+                enforce_undeclared_reads(
+                    contract, tracker, on_violation=execution.read_violation
+                )
                 return update
 
             spec = node_contract_run_spec(
@@ -215,7 +226,7 @@ def _wrap_contract_node(
                     pass_through_state=execution.pass_through_state,
                     tracker=tracker,
                 ),
-                on_violation=execution.on_violation,
+                on_violation=execution.write_violation,
                 logger=LOGGER,
             )
             return await instrument_contract_arun(
@@ -230,11 +241,13 @@ def _wrap_contract_node(
 
     @wraps(sync_fn)
     def sync_wrapper(state: StateMapping, **kwargs: Any) -> StateUpdate:
-        tracker = ReadTracker() if track_reads else None
+        tracker = ReadTracker() if execution.track_reads else None
 
         def execute(run_input: StateMapping) -> StateUpdate:
             update = sync_fn(run_input, **kwargs)
-            enforce_undeclared_reads(contract, tracker, on_violation=read_violation)
+            enforce_undeclared_reads(
+                contract, tracker, on_violation=execution.read_violation
+            )
             return update
 
         spec = node_contract_run_spec(
@@ -247,7 +260,7 @@ def _wrap_contract_node(
                 pass_through_state=execution.pass_through_state,
                 tracker=tracker,
             ),
-            on_violation=execution.on_violation,
+            on_violation=execution.write_violation,
             logger=LOGGER,
         )
         return instrument_contract_run(
@@ -279,11 +292,10 @@ def add_contract_node(
     Returns:
         The graph builder returned by ``add_node``.
     """
-    wrapped = contract_node(fn, contract, mode=mode)
+    execution = _mode_execution(mode)
+    wrapped = _wrap_contract_node(fn, contract, execution=execution)
     input_schema = (
-        None
-        if _mode_execution(mode).pass_through_state
-        else langgraph_input_schema(contract)
+        None if execution.pass_through_state else langgraph_input_schema(contract)
     )
 
     try:
@@ -323,27 +335,6 @@ def add_contract_nodes(
 def _mode_execution(mode: NodeContractMode) -> _ModeExecution:
     """Resolves the execution settings for one node contract mode."""
     return _MODE_EXECUTIONS[mode]
-
-
-def _read_audit_plan(
-    execution: _ModeExecution,
-) -> tuple[bool, ContractViolationAction]:
-    """Decides whether to audit reads and how read violations are handled.
-
-    Strict execution always audits reads and enforces them with the node's
-    violation action, so undeclared reads fail loudly instead of silently
-    resolving to a projected value. Pass-through execution keeps auditing
-    opt-in and warning-only, because the node intentionally receives the full
-    graph state. The returned action is unused when reads are not audited.
-
-    Returns:
-        A ``(audit_reads, read_violation)`` pair.
-    """
-    if not execution.pass_through_state:
-        return True, execution.on_violation
-    if execution.audit_reads:
-        return True, ContractViolationAction.WARN
-    return False, execution.on_violation
 
 
 def _node_attributes(contract: NodeContract) -> Mapping[str, object]:

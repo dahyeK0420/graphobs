@@ -8,7 +8,7 @@ The project helps users align three related surfaces:
 - Trace payloads that show curated inputs, outputs, attributes, and errors.
 - Structured logs that record lifecycle events and correlation fields.
 
-The `0.3.1` package contains the core typed contract model with enforced
+The `0.3.2` package contains the core typed contract model with enforced
 strict-mode reads, LangGraph integration helpers, callback payload projection,
 backend-portable tracing helpers, structured logging helpers, and neutral
 runnable examples.
