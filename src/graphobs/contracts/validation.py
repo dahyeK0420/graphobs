@@ -4,17 +4,18 @@ from __future__ import annotations
 
 import logging
 
+from graphobs.contracts.conformance import (
+    report_violation,
+    undeclared_write_paths,
+)
 from graphobs.contracts.models import (
     Contract,
     ContractViolationAction,
-    StateContractError,
 )
 from graphobs.state.paths import (
     StateUpdate,
     iter_update_paths,
-    join_path,
 )
-from graphobs.state.policies import policy_allows_write_path
 
 LOGGER = logging.getLogger("graphobs.contracts")
 
@@ -36,20 +37,13 @@ def validate_update(
         StateContractError: If any update path is not declared by the contract
             and ``on_violation`` is ``ContractViolationAction.RAISE``.
     """
-    undeclared = [
-        join_path(path)
-        for path in iter_update_paths(update)
-        if not any(
-            policy_allows_write_path(path, policy) for policy in contract.write_policies
-        )
-    ]
-    if undeclared:
-        error = StateContractError(contract.label, undeclared)
-        if on_violation == ContractViolationAction.WARN:
-            LOGGER.warning("%s", error)
-            return
-        LOGGER.error("%s", error)
-        raise error
+    report_violation(
+        contract.label,
+        undeclared_write_paths(contract, iter_update_paths(update)),
+        access="write",
+        on_violation=on_violation,
+        logger=LOGGER,
+    )
 
 
 __all__ = ["validate_update"]

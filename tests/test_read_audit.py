@@ -9,33 +9,8 @@ from graphobs.contracts.models import (
     NodeContract,
     StateContractError,
 )
-from graphobs.langgraph.read_audit import (
-    enforce_undeclared_reads,
-    undeclared_read_paths,
-)
+from graphobs.langgraph.read_audit import enforce_undeclared_reads
 from graphobs.state.read_tracking import ReadTracker
-
-
-def test_undeclared_read_paths_uses_shared_observed_access_classification() -> None:
-    contract = NodeContract(
-        name="audited",
-        reads=("request.text", "context.retrieved"),
-        writes=(),
-        private_reads=("scratch.step",),
-    )
-
-    assert undeclared_read_paths(
-        contract,
-        (
-            "request",
-            "request.raw",
-            "context.retrieved",
-            "context.extra",
-            "scratch.step",
-            "scratch",
-            "debug",
-        ),
-    ) == ("request.raw", "context.extra", "debug")
 
 
 def test_enforce_undeclared_reads_ignores_missing_tracker() -> None:

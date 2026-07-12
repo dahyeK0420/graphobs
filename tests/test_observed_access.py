@@ -4,6 +4,7 @@ from graphobs.state.observed_access import (
     ObservedStatePaths,
     paths_overlap,
     policy_allows_observed_read_path,
+    policy_allows_write_path,
 )
 
 
@@ -90,6 +91,22 @@ def test_observed_read_policy_allows_overlapping_paths_and_excludes_overlap() ->
         ("request", "raw", "value"),
         excluding_policy,
     )
+
+
+def test_policy_allows_write_paths_only_under_declared_paths() -> None:
+    policy = _Policy(include=("answer",))
+
+    assert policy_allows_write_path(("answer", "text"), policy)
+    assert policy_allows_write_path(("answer",), policy)
+    assert not policy_allows_write_path(("metrics",), policy)
+
+
+def test_policy_allows_write_path_excludes_overlapping_paths() -> None:
+    policy = _Policy(include=None, exclude=("request.raw",))
+
+    assert policy_allows_write_path(("request", "text"), policy)
+    assert not policy_allows_write_path(("request",), policy)
+    assert not policy_allows_write_path(("request", "raw"), policy)
 
 
 def test_paths_overlap_matches_ancestors_and_descendants() -> None:

@@ -51,6 +51,7 @@ nav:
       - Medium Companion: articles/medium-companion.md
   - Releases:
       - Overview: releases/index.md
+      - 0.3.1: releases/v0.3.1.md
       - 0.3.0: releases/v0.3.0.md
       - 0.2.1: releases/v0.2.1.md
       - 0.2.0: releases/v0.2.0.md

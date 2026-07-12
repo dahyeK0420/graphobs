@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass
 from typing import Literal, Protocol
 
 from graphobs._observability.payload_policy import (
@@ -93,25 +94,54 @@ def project_output(
     return state_diff(before_projection, after_projection)
 
 
-def project_node_payload(
+@dataclass(frozen=True)
+class PayloadObservation:
+    """How an observed contract payload is projected for telemetry.
+
+    The span execution path and the callback projection path observe the same
+    node through different mechanisms; passing one of these explicitly to
+    ``observe_payload`` keeps the projection identical between them instead of
+    letting fallback and compaction diverge silently.
+
+    Attributes:
+        fallback_to_summary: Whether a projection failure returns a compact
+            shape summary instead of raising.
+        compact: Whether a successfully projected payload is further reduced to
+            a message-compact summary.
+    """
+
+    fallback_to_summary: bool = False
+    compact: bool = False
+
+
+STRICT_OBSERVATION = PayloadObservation()
+COMPACT_OBSERVATION = PayloadObservation(fallback_to_summary=True, compact=True)
+
+
+def observe_payload(
     contract: ContractProjection,
     payload: StateMapping,
     kind: Literal["input", "output"],
     *,
-    fallback_to_summary: bool = False,
+    observation: PayloadObservation = STRICT_OBSERVATION,
 ) -> dict[str, object]:
-    """Projects one input or output payload through a contract policy.
+    """Projects one input or output payload for telemetry observation.
+
+    Used by both the span execution path and the callback projection path so a
+    contract payload is projected the same way for both, with any tolerance or
+    compaction chosen explicitly through ``observation``.
 
     Args:
         contract: Contract that declares the payload boundary.
         payload: Input or output payload to project.
         kind: Which public contract policy to use.
-        fallback_to_summary: Whether projection failures should return a
-            compact shape summary instead of raising.
+        observation: Projection tolerance and compaction policy. Defaults to
+            ``STRICT_OBSERVATION``, which raises on projection failure and does
+            not compact the projected payload.
 
     Returns:
-        A projected payload, or a compact summary when fallback is enabled and
-        projection fails.
+        A projected payload, or a compact summary when the observation allows
+        fallback and projection fails.
 
     Raises:
         ValueError: If ``kind`` is not a supported payload direction.
@@ -127,7 +157,8 @@ def project_node_payload(
         payload_kind=kind,
         project=policy.project,
         logger=LOGGER,
-        fallback_to_summary=fallback_to_summary,
+        fallback_to_summary=observation.fallback_to_summary,
+        compact_projected=observation.compact,
     )
 
 
@@ -159,10 +190,13 @@ def project_state(
 
 
 __all__ = [
+    "COMPACT_OBSERVATION",
+    "STRICT_OBSERVATION",
     "ContractProjection",
+    "PayloadObservation",
     "ProjectionPolicyLike",
+    "observe_payload",
     "project_input",
-    "project_node_payload",
     "project_output",
     "project_state",
 ]

@@ -11,7 +11,8 @@ from graphobs.contracts.models import (
     ContractViolationAction,
 )
 from graphobs.contracts.projection import (
-    project_node_payload,
+    STRICT_OBSERVATION,
+    observe_payload,
     project_output,
 )
 from graphobs.contracts.validation import validate_update
@@ -27,6 +28,7 @@ ExecutionInputBuilder = Callable[[StateMapping], StateMapping]
 ExecutionStep = Callable[[StateMapping], StateMapping]
 AsyncExecutionStep = Callable[[StateMapping], Awaitable[StateMapping]]
 UpdateBuilder = Callable[[StateMapping, StateMapping], StateUpdate]
+SpanPayloadBuilder = Callable[[StateMapping], dict[str, object]]
 
 
 @dataclass(frozen=True)
@@ -37,6 +39,7 @@ class ContractRunSpec:
     span_kind: str
     attributes: Mapping[str, object]
     execution_input: ExecutionInputBuilder
+    span_input: SpanPayloadBuilder
     validation_update: UpdateBuilder
     public_output: UpdateBuilder
     return_value: UpdateBuilder | None
@@ -58,7 +61,7 @@ def instrument_contract_run(
         attributes=spec.attributes,
     ) as span:
         try:
-            set_span_input(span, project_node_payload(spec.contract, state, "input"))
+            set_span_input(span, spec.span_input(state))
             run_input = spec.execution_input(state)
             run_result = execute(run_input)
             validate_update(
@@ -95,7 +98,7 @@ async def instrument_contract_arun(
         attributes=spec.attributes,
     ) as span:
         try:
-            set_span_input(span, project_node_payload(spec.contract, state, "input"))
+            set_span_input(span, spec.span_input(state))
             run_input = spec.execution_input(state)
             run_result = await execute(run_input)
             validate_update(
@@ -134,11 +137,18 @@ def node_contract_run_spec(
         span_kind=span_kind,
         attributes=attributes,
         execution_input=execution_input,
+        span_input=lambda raw_state: observe_payload(
+            contract,
+            raw_state,
+            "input",
+            observation=STRICT_OBSERVATION,
+        ),
         validation_update=lambda _run_input, update: update,
-        public_output=lambda _run_input, update: project_node_payload(
+        public_output=lambda _run_input, update: observe_payload(
             contract,
             update,
             "output",
+            observation=STRICT_OBSERVATION,
         ),
         return_value=lambda _run_input, update: update,
         on_violation=on_violation,
@@ -161,6 +171,12 @@ def subgraph_contract_run_spec(
         span_kind=span_kind,
         attributes=attributes,
         execution_input=lambda raw_state: build_execution_input(contract, raw_state),
+        span_input=lambda raw_state: observe_payload(
+            contract,
+            raw_state,
+            "input",
+            observation=STRICT_OBSERVATION,
+        ),
         validation_update=state_diff,
         public_output=lambda subgraph_input, after_state: project_output(
             contract,

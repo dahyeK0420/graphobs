@@ -16,20 +16,6 @@ from graphobs.state.paths import (
     split_path,
     state_diff,
 )
-from graphobs.state.policies import (
-    policy_allows_read_path,
-    policy_allows_write_path,
-)
-
-
-class _Policy:
-    def __init__(
-        self,
-        include: tuple[str, ...] | None,
-        exclude: tuple[str, ...] = (),
-    ) -> None:
-        self.include = include
-        self.exclude = exclude
 
 
 def test_normalize_paths_trims_parts_and_removes_duplicates() -> None:
@@ -114,31 +100,3 @@ def test_is_prefix_matches_ancestors_and_exact_paths() -> None:
     assert is_prefix(("answer",), ("answer", "text"))
     assert is_prefix(("answer", "text"), ("answer", "text"))
     assert not is_prefix(("answer", "text"), ("answer",))
-
-
-def test_policy_allows_write_paths_only_under_declared_paths() -> None:
-    policy = _Policy(include=("answer",))
-
-    assert policy_allows_write_path(("answer", "text"), policy)
-    assert policy_allows_write_path(("answer",), policy)
-    assert not policy_allows_write_path(("metrics",), policy)
-
-
-def test_policy_allows_read_paths_that_overlap_declared_paths() -> None:
-    policy = _Policy(include=("request.text",))
-
-    assert policy_allows_read_path(("request",), policy)
-    assert policy_allows_read_path(("request", "text"), policy)
-    assert policy_allows_read_path(("request", "text", "normalized"), policy)
-    assert not policy_allows_read_path(("context",), policy)
-
-
-def test_policy_excludes_overlapping_paths() -> None:
-    policy = _Policy(include=None, exclude=("request.raw",))
-
-    assert policy_allows_write_path(("request", "text"), policy)
-    assert not policy_allows_write_path(("request",), policy)
-    assert not policy_allows_write_path(("request", "raw"), policy)
-    assert not policy_allows_read_path(("request", "raw"), policy)
-    assert not policy_allows_read_path(("request", "raw", "value"), policy)
-    assert not policy_allows_read_path(("request",), policy)
