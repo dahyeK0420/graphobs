@@ -13,49 +13,6 @@ class _Policy:
         self.include = include
 
 
-def test_observed_paths_select_most_specific_reads_in_order() -> None:
-    observed = ObservedStatePaths(
-        (
-            "request",
-            "request.text",
-            "context",
-            "context.locale",
-            "request.raw",
-        )
-    )
-
-    assert observed.most_specific() == (
-        "request.text",
-        "request.raw",
-        "context.locale",
-    )
-
-
-def test_observed_paths_partition_private_overlapping_paths() -> None:
-    observed = ObservedStatePaths(
-        (
-            "request.text",
-            "scratch.notes",
-            "scratch.step",
-            "scratch.step.detail",
-        )
-    )
-
-    partition = observed.partition_private(("scratch",))
-
-    assert partition.public == ("request.text",)
-    assert partition.private == ("scratch",)
-
-
-def test_observed_paths_partition_private_specific_override() -> None:
-    observed = ObservedStatePaths(("request.text", "scratch.notes"))
-
-    partition = observed.partition_private(("scratch.notes.detail",))
-
-    assert partition.public == ("request.text",)
-    assert partition.private == ("scratch.notes",)
-
-
 def test_observed_paths_classify_undeclared_reads_in_observed_order() -> None:
     observed = ObservedStatePaths(
         (

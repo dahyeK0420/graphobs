@@ -5,6 +5,7 @@ from typing import cast
 
 import pytest
 
+from graphobs.contracts.conformance import validate_update
 from graphobs.contracts.models import (
     Contract,
     ContractViolationAction,
@@ -18,9 +19,6 @@ from graphobs.contracts.projection import (
     observe_payload,
     project_input,
     project_output,
-)
-from graphobs.contracts.validation import (
-    validate_update,
 )
 from graphobs.state.paths import state_diff
 

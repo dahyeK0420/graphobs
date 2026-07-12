@@ -6,9 +6,7 @@ import logging
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Literal
 
-from graphobs._observability.payload_policy import (
-    project_contract_payload,
-)
+from graphobs.payloads import project_contract_payload
 from graphobs.state.paths import (
     StateMapping,
     get_path,

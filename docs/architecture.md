@@ -19,22 +19,20 @@ flowchart TD
 
     %% ---------- Integration (optional, runtime-coupled) ----------
     subgraph integration["Integration layers — optional, runtime-coupled"]
-        lg["langgraph/<br/>node and subgraph wrappers<br/>nodes · subgraphs · execution<br/>callbacks (projection) · read_audit · schemas"]
-        tracing["tracing.py<br/>graph span helpers · error marking<br/>compact / full payloads<br/>PayloadSerializer protocol"]
+        lg["langgraph/<br/>node and subgraph wrappers<br/>nodes · subgraphs · execution<br/>callbacks (projection) · schemas"]
+        tracing["tracing.py<br/>graph span helpers · error marking<br/>compact / full payloads"]
         logging["logging/<br/>structured lifecycle logs<br/>GraphLogCallback · LogContext<br/>CorrelationFields · build_invoke_config"]
     end
 
     %% ---------- Core (pure Python) ----------
     subgraph core["Core contract layer — pure Python, runtime-independent"]
-        contracts["contracts/<br/>NodeContract · SubgraphContract<br/>ProjectionPolicy · validate_update<br/>models · projection · validation · conformance"]
-        discovery["discovery/<br/>drafts DiscoveredContract<br/>from synthetic samples<br/>runner · draft"]
+        contracts["contracts/<br/>NodeContract · SubgraphContract<br/>ProjectionPolicy · validate_update<br/>models · projection · conformance"]
     end
 
     %% ---------- Shared primitives ----------
     subgraph shared["Shared primitives — implemented once, reused everywhere"]
-        policy["_observability/payload_policy.py<br/>internal payload hub"]
-        payloads["payloads.py<br/>shape_summary<br/>message_compact_summary"]
-        state["state/<br/>dotted paths · read tracking<br/>state diffs · private overrides<br/>paths · observed_access · read_tracking"]
+        payloads["payloads.py<br/>shape / message summaries<br/>+ serialize / project policy"]
+        state["state/<br/>dotted paths · read tracking<br/>state diffs<br/>paths · observed_access · read_tracking"]
     end
 
     %% ---------- External ----------
@@ -55,17 +53,12 @@ flowchart TD
     lg --> contracts
     lg --> state
     lg --> tracing
-    tracing --> policy
-    logging --> policy
+    tracing --> payloads
+    logging --> payloads
 
     %% Core edges
-    contracts --> policy
+    contracts --> payloads
     contracts --> state
-    discovery --> contracts
-    discovery --> state
-
-    %% Shared edges
-    policy --> payloads
 
     %% External edges
     lg -.-> lgrt
@@ -81,16 +74,15 @@ flowchart TD
 
     class examples,demo consumerCls;
     class lg,tracing,logging integrationCls;
-    class contracts,discovery coreCls;
-    class policy,payloads,state sharedCls;
+    class contracts coreCls;
+    class payloads,state sharedCls;
     class lgrt,otel,stdlog externalCls;
 ```
 
-Two reuse spines hold the kit together. Payload shaping lives in `payloads.py`
-(the leaf primitive) and is applied through the internal `_observability/payload_policy.py`
-hub, which contracts, tracing, and logging all import — so compact-by-default
-serialization is defined exactly once. State-path handling lives in `state/` and is
-reused by contracts, discovery, and the LangGraph integration.
+Two reuse spines hold the kit together. Payload shaping lives in `payloads.py`,
+which contracts, tracing, and logging all import — so compact-by-default
+serialization and its mode/serialize policy are defined exactly once. State-path
+handling lives in `state/` and is reused by contracts and the LangGraph integration.
 
 ## Final Package Shape
 
@@ -106,7 +98,6 @@ src/graphobs/
     conformance.py
     models.py
     projection.py
-    validation.py
   state/
     __init__.py
     observed_access.py
@@ -117,22 +108,14 @@ src/graphobs/
     callbacks.py
     execution.py
     nodes.py
-    read_audit.py
     schemas.py
     subgraphs.py
-  _observability/
-    __init__.py
-    payload_policy.py
   logging/
     __init__.py
     callback.py
     context.py
     invoke_config.py
     lifecycle.py
-  discovery/
-    __init__.py
-    draft.py
-    runner.py
   demo/
     __init__.py
     span_records.py
@@ -152,8 +135,6 @@ telemetry exporters, or validation frameworks. It provides:
 - `ProjectionPolicy` for dotted-path include rules.
 - Validation helpers that reject undeclared writes without storing state values
   in error objects.
-- Experimental discovery helpers that draft node contracts from synthetic
-  sample states.
 
 The tracing layer depends on OpenTelemetry and OpenInference semantic
 conventions. It provides:
@@ -186,22 +167,16 @@ Log events contain correlation fields, durations, run identifiers, and compact
 input/output shape summaries. They do not configure exporters or store full
 state payloads.
 
-Compact shape summaries are implemented once in the public `payloads` module and
+Compact shape summaries, together with the shared trace payload mode and
+serialization policy, are implemented once in the public `payloads` module and
 reused by contracts, callback projection fallbacks, structured logs, and
-tracing. The tracing `PayloadSerializer` protocol is the customization point for
-applications that need additional redaction rules before payloads are
-serialized.
+tracing.
 
-Dotted state path operations, observed read classification, private override
-splitting, and state diffs are implemented once in the `state` package and
-reused by contracts, discovery, and LangGraph integration code. The package root
-exposes a short headline interface; lower-level primitives remain available
-from their concrete implementation modules.
-
-The discovery module is runtime-independent. It runs sync or async node
-functions against synthetic samples, records observed mapping reads and returned
-update writes, and returns a draft `DiscoveredContract` for review. Discovery is
-sample-dependent and best-effort, so it does not replace manual contract design.
+Dotted state path operations, observed read classification, and state diffs are
+implemented once in the `state` package and reused by contracts and LangGraph
+integration code. The package root exposes a short headline interface;
+lower-level primitives remain available from their concrete implementation
+modules.
 
 ## Intended Layers
 

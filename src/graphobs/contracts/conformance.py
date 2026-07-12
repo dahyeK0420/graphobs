@@ -1,9 +1,10 @@
 """Shared contract conformance checks for reads, writes, and violations.
 
-One place owns the two questions every enforcement path asks — "which observed
-paths are undeclared?" and "how is a violation reported?" — so runtime write
-validation, runtime read enforcement, and sample-based drift checks stay
-consistent instead of re-deriving the same rules.
+One place owns what every enforcement path asks — "which observed paths are
+undeclared?" and "how is a violation reported?" — plus the two runtime entry
+points built on them: ``validate_update`` (writes) and
+``enforce_undeclared_reads`` (reads). Both report through ``report_violation``
+so reads and writes share one violation policy.
 """
 
 from __future__ import annotations
@@ -21,7 +22,18 @@ from graphobs.state.observed_access import (
     ObservedStatePaths,
     policy_allows_write_path,
 )
-from graphobs.state.paths import Path, join_path
+from graphobs.state.paths import (
+    Path,
+    StateUpdate,
+    iter_update_paths,
+    join_path,
+)
+from graphobs.state.read_tracking import ReadTracker
+
+# Reads surface through the LangGraph node wrapper; writes are a contract-level
+# check. Both channels are preserved so existing log consumers keep working.
+_READ_LOGGER = logging.getLogger("graphobs.langgraph")
+_WRITE_LOGGER = logging.getLogger("graphobs.contracts")
 
 
 def undeclared_read_paths(
@@ -51,8 +63,7 @@ def undeclared_write_paths(
 
     Args:
         contract: Contract that declares allowed public and private writes.
-        paths: Leaf update paths, for example from ``iter_update_paths`` or a
-            discovered contract's write paths.
+        paths: Leaf update paths, for example from ``iter_update_paths``.
 
     Returns:
         The dotted paths not allowed by any write policy, in the given order.
@@ -102,8 +113,68 @@ def report_violation(
     raise error
 
 
+def validate_update(
+    contract: Contract,
+    update: StateUpdate,
+    *,
+    on_violation: ContractViolationAction = ContractViolationAction.RAISE,
+) -> None:
+    """Validates that an update only writes declared paths.
+
+    Args:
+        contract: Contract that declares allowed public and private writes.
+        update: State update returned by a node or subgraph.
+        on_violation: Whether undeclared writes raise or log a warning.
+
+    Raises:
+        StateContractError: If any update path is not declared by the contract
+            and ``on_violation`` is ``ContractViolationAction.RAISE``.
+    """
+    report_violation(
+        contract.label,
+        undeclared_write_paths(contract, iter_update_paths(update)),
+        access="write",
+        on_violation=on_violation,
+        logger=_WRITE_LOGGER,
+    )
+
+
+def enforce_undeclared_reads(
+    contract: Contract,
+    tracker: ReadTracker | None,
+    *,
+    on_violation: ContractViolationAction = ContractViolationAction.RAISE,
+) -> None:
+    """Raises or warns when observed reads fall outside a contract.
+
+    Mirrors ``validate_update`` on the read side; both delegate to
+    ``report_violation`` so reads and writes share one violation policy.
+
+    Args:
+        contract: Contract that declares allowed public and private reads.
+        tracker: Recorder of observed reads, or ``None`` when auditing is off.
+        on_violation: Whether undeclared reads raise or log a warning.
+
+    Raises:
+        StateContractError: If any observed read path is not declared by the
+            contract and ``on_violation`` is ``ContractViolationAction.RAISE``.
+    """
+    if tracker is None:
+        return
+
+    report_violation(
+        contract.label,
+        undeclared_read_paths(contract, tracker.paths()),
+        access="read",
+        on_violation=on_violation,
+        logger=_READ_LOGGER,
+    )
+
+
 __all__ = [
+    "enforce_undeclared_reads",
     "report_violation",
     "undeclared_read_paths",
     "undeclared_write_paths",
+    "validate_update",
 ]

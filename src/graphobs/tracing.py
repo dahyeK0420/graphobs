@@ -6,7 +6,7 @@ import logging
 from collections.abc import Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from enum import StrEnum
-from typing import Protocol, cast
+from typing import cast
 
 from openinference.semconv.trace import SpanAttributes
 from opentelemetry import context as otel_context
@@ -14,9 +14,7 @@ from opentelemetry import trace
 from opentelemetry.trace import Span, Status, StatusCode
 from opentelemetry.util.types import AttributeValue
 
-from graphobs._observability.payload_policy import (
-    serialize_trace_payload,
-)
+from graphobs.payloads import serialize_trace_payload
 
 LOGGER = logging.getLogger(__name__)
 TRACER_NAME = "graphobs"
@@ -24,58 +22,18 @@ JSON_MIME_TYPE = "application/json"
 
 
 class TracePayloadMode(StrEnum):
-    """Controls how input and output values are serialized into spans."""
+    """Controls how input and output values are serialized into spans.
+
+    Message-compact mode (the default) preserves role and truncated content for
+    message-shaped values and uses structural summaries for all others. Compact
+    mode records structural summaries for all values. Full mode records complete
+    JSON-compatible values and raises when the payload cannot be represented as
+    JSON; use it only for controlled debugging data that is safe to store.
+    """
 
     COMPACT = "compact"
     MESSAGE_COMPACT = "message_compact"
     FULL = "full"
-
-
-class PayloadSerializer(Protocol):
-    """Callable interface for span payload serialization."""
-
-    def __call__(
-        self,
-        value: object,
-        *,
-        mode: TracePayloadMode = TracePayloadMode.MESSAGE_COMPACT,
-    ) -> str:
-        """Serializes a payload for an OpenInference span attribute.
-
-        Args:
-            value: Payload value to serialize.
-            mode: Payload serialization mode.
-
-        Returns:
-            A JSON string suitable for an OpenTelemetry span attribute.
-        """
-
-
-def default_payload_serializer(
-    value: object,
-    *,
-    mode: TracePayloadMode = TracePayloadMode.MESSAGE_COMPACT,
-) -> str:
-    """Serializes a payload with the package default trace policy.
-
-    Message-compact mode (the default) preserves role and truncated content
-    for message-shaped values and uses structural summaries for all others.
-    Compact mode records structural summaries for all values. Full mode
-    records complete JSON-compatible values and raises when the payload
-    cannot be represented as JSON.
-
-    Args:
-        value: Payload value to serialize.
-        mode: Payload serialization mode.
-
-    Returns:
-        A JSON string suitable for an OpenTelemetry span attribute.
-
-    Raises:
-        TypeError: If full mode receives a value that is not JSON serializable.
-        ValueError: If ``mode`` is not supported.
-    """
-    return serialize_trace_payload(value, mode=mode)
 
 
 @contextmanager
@@ -88,7 +46,6 @@ def start_graph_span(
     context: otel_context.Context | None = None,
     *,
     mode: TracePayloadMode = TracePayloadMode.MESSAGE_COMPACT,
-    serializer: PayloadSerializer | None = None,
 ) -> Iterator[Span]:
     """Starts a graph span with OpenInference-compatible attributes.
 
@@ -103,12 +60,10 @@ def start_graph_span(
         attributes: Optional flat or nested searchable attributes.
         context: Optional OpenTelemetry context.
         mode: Payload serialization mode.
-        serializer: Optional payload serializer override.
 
     Yields:
         The active OpenTelemetry span.
     """
-    active_serializer = serializer or default_payload_serializer
     tracer = trace.get_tracer(TRACER_NAME)
 
     with tracer.start_as_current_span(name, context=context) as span:
@@ -116,9 +71,9 @@ def start_graph_span(
         if attributes is not None:
             set_span_attributes(span, attributes)
         if input is not None:
-            set_span_input(span, input, mode=mode, serializer=active_serializer)
+            set_span_input(span, input, mode=mode)
         if output is not None:
-            set_span_output(span, output, mode=mode, serializer=active_serializer)
+            set_span_output(span, output, mode=mode)
         yield span
 
 
@@ -127,7 +82,6 @@ def set_span_input(
     value: object,
     *,
     mode: TracePayloadMode = TracePayloadMode.MESSAGE_COMPACT,
-    serializer: PayloadSerializer | None = None,
 ) -> None:
     """Sets the OpenInference input payload attributes on a span.
 
@@ -135,10 +89,8 @@ def set_span_input(
         span: OpenTelemetry span to update.
         value: Input payload value.
         mode: Payload serialization mode.
-        serializer: Optional payload serializer override.
     """
-    active_serializer = serializer or default_payload_serializer
-    serialized = _serialize_payload(value, mode=mode, serializer=active_serializer)
+    serialized = _serialize_payload(value, mode=mode)
     set_span_attributes(
         span,
         {
@@ -153,7 +105,6 @@ def set_span_output(
     value: object,
     *,
     mode: TracePayloadMode = TracePayloadMode.MESSAGE_COMPACT,
-    serializer: PayloadSerializer | None = None,
 ) -> None:
     """Sets the OpenInference output payload attributes on a span.
 
@@ -161,10 +112,8 @@ def set_span_output(
         span: OpenTelemetry span to update.
         value: Output payload value.
         mode: Payload serialization mode.
-        serializer: Optional payload serializer override.
     """
-    active_serializer = serializer or default_payload_serializer
-    serialized = _serialize_payload(value, mode=mode, serializer=active_serializer)
+    serialized = _serialize_payload(value, mode=mode)
     set_span_attributes(
         span,
         {
@@ -218,14 +167,9 @@ def mark_span_error(span: Span, exc: BaseException) -> None:
         raise
 
 
-def _serialize_payload(
-    value: object,
-    *,
-    mode: TracePayloadMode,
-    serializer: PayloadSerializer,
-) -> str:
+def _serialize_payload(value: object, *, mode: TracePayloadMode) -> str:
     try:
-        return serializer(value, mode=mode)
+        return serialize_trace_payload(value, mode=mode)
     except Exception as exc:
         LOGGER.error("Failed to serialize trace payload: %s", exc)
         raise
@@ -291,9 +235,7 @@ def _require_attribute_sequence(value: Sequence[object]) -> AttributeValue:
 
 
 __all__ = [
-    "PayloadSerializer",
     "TracePayloadMode",
-    "default_payload_serializer",
     "mark_span_error",
     "set_span_attributes",
     "set_span_input",

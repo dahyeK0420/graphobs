@@ -25,7 +25,7 @@ own export path.
 
 Use logs when you need an operational event stream: what ran, when it started,
 how long it took, whether it failed, and which session or request it belongs to.
-Use the same `LogContext.as_attributes()` values on spans when logs and traces
+Use the same `LogContext.as_metadata()` values on spans when logs and traces
 should share correlation fields.
 
 LangGraph node callbacks may receive the graph runtime's outer chain payload

@@ -10,6 +10,7 @@ from enum import StrEnum
 from functools import wraps
 from typing import Any, Protocol, TypeAlias, cast, overload
 
+from graphobs.contracts.conformance import enforce_undeclared_reads
 from graphobs.contracts.models import (
     Contract,
     ContractViolationAction,
@@ -24,9 +25,6 @@ from graphobs.langgraph.execution import (
     build_execution_input,
     instrument_contract_arun,
     instrument_contract_run,
-)
-from graphobs.langgraph.read_audit import (
-    enforce_undeclared_reads,
 )
 from graphobs.langgraph.schemas import (
     langgraph_input_schema,

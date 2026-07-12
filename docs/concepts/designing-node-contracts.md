@@ -9,41 +9,6 @@ Choose a node with stable input and output shape. Avoid the most complex node in
 the graph for the first adoption step. The first contract should prove the
 workflow, not model every possible boundary at once.
 
-## Draft From Synthetic Samples
-
-For an existing node, `discover_contract` can run the node against synthetic
-sample states and produce a draft contract boundary.
-
-```python
-from graphobs.discovery.runner import discover_contract
-
-
-def classify(state):
-    return {"classification": {"label": state["request"]["text"][:8]}}
-
-
-draft = discover_contract(
-    classify,
-    [{"request": {"text": "synthetic question"}}],
-    name="classify",
-)
-
-contract = draft.to_node_contract()
-```
-
-Discovery observes mapping reads from operations such as `state["key"]`,
-`state.get("key")`, membership checks, and mapping iteration. It records
-returned nested update paths as writes. All discovered paths are public by
-default. Use private overrides when reviewing the draft:
-
-```python
-contract = draft.to_node_contract(private_reads=("scratch",))
-```
-
-Discovery is experimental. It is sample-dependent, best-effort, and intended
-for synthetic fixtures only. It cannot see branches your samples do not
-exercise, and it is not a replacement for reviewing the final `NodeContract`.
-
 ## Choose Reads
 
 Declare only the state paths the node needs to make its decision.

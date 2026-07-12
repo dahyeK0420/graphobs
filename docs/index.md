@@ -48,7 +48,7 @@ with start_graph_span(
     "classify",
     "CHAIN",
     input=public_input,
-    attributes=log_context.as_attributes(),
+    attributes=log_context.as_metadata(),
 ):
     ...
 ```

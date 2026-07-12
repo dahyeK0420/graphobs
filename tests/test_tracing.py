@@ -12,10 +12,8 @@ from opentelemetry.trace import StatusCode
 
 from graphobs.tracing import (
     TracePayloadMode,
-    default_payload_serializer,
     mark_span_error,
     set_span_attributes,
-    set_span_input,
     start_graph_span,
 )
 
@@ -111,63 +109,6 @@ def test_full_mode_is_explicit(span_exporter: InMemorySpanExporter) -> None:
     input_value = span.attributes[SpanAttributes.INPUT_VALUE]
     assert isinstance(input_value, str)
     assert json.loads(input_value) == payload
-
-
-def test_set_span_input_accepts_custom_serializer(
-    span_exporter: InMemorySpanExporter,
-) -> None:
-    def fixed_serializer(
-        value: object,
-        *,
-        mode: TracePayloadMode = TracePayloadMode.MESSAGE_COMPACT,
-    ) -> str:
-        return json.dumps(
-            {"custom": type(value).__name__, "mode": mode.value},
-            sort_keys=True,
-            separators=(",", ":"),
-        )
-
-    with start_graph_span("custom", "CHAIN") as span:
-        set_span_input(span, {"payload": "value"}, serializer=fixed_serializer)
-
-    finished_span = span_exporter.get_finished_spans()[0]
-
-    assert finished_span.attributes is not None
-    input_value = finished_span.attributes[SpanAttributes.INPUT_VALUE]
-    assert isinstance(input_value, str)
-    assert json.loads(input_value) == {"custom": "dict", "mode": "message_compact"}
-
-
-def test_custom_serializer_can_redact_message_compact_payloads(
-    span_exporter: InMemorySpanExporter,
-) -> None:
-    def redacting_serializer(
-        value: object,
-        *,
-        mode: TracePayloadMode = TracePayloadMode.MESSAGE_COMPACT,
-    ) -> str:
-        if mode is TracePayloadMode.MESSAGE_COMPACT and isinstance(value, dict):
-            return json.dumps(
-                {"type": "mapping", "redacted": "secret" in value},
-                sort_keys=True,
-                separators=(",", ":"),
-            )
-        return default_payload_serializer(value, mode=mode)
-
-    with start_graph_span(
-        "redacted",
-        "CHAIN",
-        input={"secret": "synthetic"},
-        serializer=redacting_serializer,
-    ):
-        pass
-
-    finished_span = span_exporter.get_finished_spans()[0]
-
-    assert finished_span.attributes is not None
-    input_value = finished_span.attributes[SpanAttributes.INPUT_VALUE]
-    assert isinstance(input_value, str)
-    assert json.loads(input_value) == {"redacted": True, "type": "mapping"}
 
 
 def test_unsupported_attribute_value_logs_warning(

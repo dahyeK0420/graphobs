@@ -1,4 +1,4 @@
-"""Shared mapping read tracking for discovery and runtime audits."""
+"""Shared mapping read tracking for runtime read audits."""
 
 from __future__ import annotations
 

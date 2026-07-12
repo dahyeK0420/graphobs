@@ -49,7 +49,6 @@ nav:
   - Articles:
       - Overview: articles/index.md
       - Medium Companion: articles/medium-companion.md
-      - Traces Are a Mess, Part 2: articles/traces-mess-part-2.md
   - Releases:
       - Overview: releases/index.md
       - 0.4.0: releases/v0.4.0.md
@@ -64,7 +63,6 @@ nav:
       - Package: reference/package.md
       - Callbacks: reference/callbacks.md
       - Contracts: reference/contracts.md
-      - Discovery: reference/discovery.md
       - LangGraph: reference/langgraph.md
       - Logging: reference/logging.md
       - Payloads: reference/payloads.md

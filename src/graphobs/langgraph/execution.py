@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Awaitable, Callable, Mapping, MutableMapping
 
+from graphobs.contracts.conformance import validate_update
 from graphobs.contracts.models import (
     Contract,
     ContractViolationAction,
@@ -13,7 +14,6 @@ from graphobs.contracts.projection import (
     STRICT_OBSERVATION,
     observe_payload,
 )
-from graphobs.contracts.validation import validate_update
 from graphobs.state.paths import StateMapping, StateUpdate
 from graphobs.tracing import (
     mark_span_error,

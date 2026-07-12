@@ -6,13 +6,13 @@ import logging as stdlib_logging
 from collections.abc import Mapping, Sequence
 from time import perf_counter_ns
 
-from graphobs._observability.payload_policy import payload_summary
 from graphobs.logging.context import (
     CorrelationFields,
     LogContext,
     Metadata,
     field_names,
 )
+from graphobs.payloads import shape_summary
 
 DEFAULT_ERROR_MESSAGE_MAX_LENGTH = 512
 EVENT_LOGGER_NAME = "graphobs.logs"
@@ -181,7 +181,7 @@ def build_start_payload(
         {
             "run_name": run_name(serialized, metadata),
             "tags": tuple(tags or ()),
-            "input_summary": payload_summary(value),
+            "input_summary": shape_summary(value),
         }
     )
     return payload
@@ -209,7 +209,7 @@ def build_finish_payload(
         metadata=metadata,
     )
     payload["duration_ms"] = duration_ms
-    payload["output_summary"] = payload_summary(value)
+    payload["output_summary"] = shape_summary(value)
     return payload
 
 
@@ -297,6 +297,35 @@ def elapsed_duration_ms(started_at_ns: int, finished_at_ns: int) -> float:
     return round((finished_at_ns - started_at_ns) / NS_PER_MS, 3)
 
 
+def reject_correlation_conflict(
+    key: str,
+    existing: object,
+    incoming: object,
+    *,
+    failure_context: str,
+) -> None:
+    """Raises when an existing value disagrees with an incoming correlation value.
+
+    Shared by invoke-config assembly and per-event payload assembly so both
+    report a correlation conflict identically. Does nothing when there is no
+    existing value or the values agree.
+
+    Args:
+        key: Correlation field name being merged.
+        existing: Value already present for the field, if any.
+        incoming: Value being merged in.
+        failure_context: Human-readable prefix for the failure log.
+
+    Raises:
+        ValueError: If ``existing`` is not ``None`` and differs from ``incoming``.
+    """
+    if existing is None or existing == incoming:
+        return
+    error = ValueError(f"metadata correlation field {key!r} conflicts with LogContext")
+    INTERNAL_LOGGER.error("%s: %s", failure_context, error)
+    raise error
+
+
 def merge_correlation(
     log_context: LogContext,
     fields: CorrelationFields,
@@ -307,13 +336,12 @@ def merge_correlation(
         metadata_value = metadata.get(key)
         if metadata_value is None:
             continue
-        existing = correlation.get(key)
-        if existing is not None and existing != metadata_value:
-            error = ValueError(
-                f"metadata correlation field {key!r} conflicts with LogContext"
-            )
-            INTERNAL_LOGGER.error("Failed to build graph log payload: %s", error)
-            raise error
+        reject_correlation_conflict(
+            key,
+            correlation.get(key),
+            metadata_value,
+            failure_context="Failed to build graph log payload",
+        )
         correlation[key] = metadata_value
     return correlation
 

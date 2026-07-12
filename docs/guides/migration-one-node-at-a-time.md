@@ -214,31 +214,6 @@ reducer re-applies the value and duplicates the seeded input. Keep accumulating
 channels on node-level contracts, or exclude them from `parent_output` and let
 the subgraph own them privately.
 
-## Guard Against Contract Drift
-
-Once a node has a contract, keep them from drifting apart. `assert_contract_matches`
-runs the node against synthetic samples and, by default, logs a warning when the
-node reads or writes a path the contract does not declare, returning the
-discovered draft so you can inspect it. Pass
-`on_drift=ContractViolationAction.RAISE` in a unit test or CI check to turn drift
-into a raised `ContractDriftError` instead of a surprise at runtime:
-
-```python
-from graphobs.contracts.models import ContractViolationAction
-from graphobs.discovery.drift import assert_contract_matches
-
-def test_classify_stays_within_contract() -> None:
-    assert_contract_matches(
-        classify,
-        classify_contract,
-        [{"request": {"text": "hello"}}],
-        on_drift=ContractViolationAction.RAISE,
-    )
-```
-
-Discovery is sample-dependent, so cover the branches you care about. Use
-`assert_contract_amatches` for async nodes.
-
 ## Quick Check
 
 The first migrated node is complete when:

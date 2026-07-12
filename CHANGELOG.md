@@ -14,16 +14,31 @@ This project follows Semantic Versioning once public releases begin.
   protocols are removed from `graphobs.contracts.projection`, and the now-orphaned
   `delete_path` is removed from `graphobs.state.paths`. The overlapping
   contract/policy protocols are consolidated to `Contract` and `PathPolicy`.
-- Changed: contract drift is advisory by default. `assert_contract_matches` and
-  `assert_contract_amatches` log a warning and return the discovered draft; pass
-  `on_drift=ContractViolationAction.RAISE` (for example in a CI test) to raise
-  `ContractDriftError` as before.
+- Breaking: the experimental contract-discovery subsystem is removed.
+  `graphobs.discovery` (`discover_contract`, `adiscover_contract`,
+  `assert_contract_matches`, `assert_contract_amatches`, `DiscoveredContract`,
+  and the drift helpers) had no runtime, package-root, or example caller. Design
+  node contracts directly and use `AUDIT` mode to surface a node's real boundary
+  from production traffic.
+- Breaking: the `graphobs.tracing` payload-serializer override is removed
+  (`PayloadSerializer`, `default_payload_serializer`, and the `serializer=`
+  parameter on the span helpers); no caller overrode it. Select payload shape
+  with `mode=` / `TracePayloadMode` — `TracePayloadMode.FULL` still records
+  complete payloads for controlled debugging.
+- Breaking: `LogContext.as_attributes` is removed; it was a pure alias of
+  `as_metadata`. Use `as_metadata()` for both invoke metadata and span attributes.
 - Internal: the contract execution lifecycle is flattened. The `ContractRunSpec`
   dataclass and the `node_contract_run_spec` / `subgraph_contract_run_spec`
   factories are removed from `graphobs.langgraph.execution` in favor of a single
   parameterized `instrument_contract_run` / `instrument_contract_arun` pair.
-- No change to the package-root interface, subgraph contracts, node contract
-  modes (`OBSERVE`/`AUDIT`/`ENFORCE`), or the discovery helpers.
+- Internal: single-purpose modules are folded into their shared homes.
+  `contracts/validation.py` (`validate_update`) and `langgraph/read_audit.py`
+  (`enforce_undeclared_reads`) move into `contracts/conformance.py`; the payload
+  mode/serialize policy from `_observability/payload_policy.py` merges into
+  `payloads.py`. The `_observability` and empty `_integrations` packages are
+  removed.
+- No change to the package-root interface, subgraph contracts, or node contract
+  modes (`OBSERVE`/`AUDIT`/`ENFORCE`).
 
 ## 0.3.1 - 2026-07-12
 

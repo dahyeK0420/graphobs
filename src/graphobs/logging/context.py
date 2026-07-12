@@ -114,20 +114,6 @@ class LogContext:
         """
         return self.as_mapping(fields)
 
-    def as_attributes(
-        self,
-        fields: CorrelationFields | None = None,
-    ) -> dict[str, object]:
-        """Returns correlation values suitable for span attributes.
-
-        Args:
-            fields: Optional field-name configuration.
-
-        Returns:
-            Flat attributes using the same field names as structured logs.
-        """
-        return self.as_mapping(fields)
-
     def as_mapping(self, fields: CorrelationFields | None = None) -> dict[str, object]:
         """Returns non-empty correlation values with configured field names.
 

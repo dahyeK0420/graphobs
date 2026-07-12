@@ -7,14 +7,11 @@ from types import ModuleType
 import pytest
 
 import graphobs
+import graphobs.contracts.conformance as conformance
 import graphobs.contracts.models as models
 import graphobs.contracts.projection as projection
-import graphobs.contracts.validation as validation
 import graphobs.demo.span_records as span_records
 import graphobs.demo.tracing_setup as tracing_setup
-import graphobs.discovery.draft as draft
-import graphobs.discovery.drift as drift
-import graphobs.discovery.runner as runner
 import graphobs.langgraph.callbacks as callbacks
 import graphobs.langgraph.nodes as nodes
 import graphobs.langgraph.schemas as schemas
@@ -110,7 +107,16 @@ def test_package_root_exports_headline_interface_only() -> None:
                 "project_state",
             ],
         ),
-        (validation, ["validate_update"]),
+        (
+            conformance,
+            [
+                "enforce_undeclared_reads",
+                "report_violation",
+                "undeclared_read_paths",
+                "undeclared_write_paths",
+                "validate_update",
+            ],
+        ),
         (
             paths,
             [
@@ -167,25 +173,6 @@ def test_package_root_exports_headline_interface_only() -> None:
         ),
         (callback, ["GraphLogCallback"]),
         (invoke_config, ["InvokeConfig", "build_invoke_config"]),
-        (draft, ["DiscoveredContract"]),
-        (
-            runner,
-            [
-                "AsyncDiscoveryNode",
-                "ContractDiscoveryError",
-                "SyncDiscoveryNode",
-                "adiscover_contract",
-                "discover_contract",
-            ],
-        ),
-        (
-            drift,
-            [
-                "ContractDriftError",
-                "assert_contract_amatches",
-                "assert_contract_matches",
-            ],
-        ),
         (
             tracing_setup,
             [
@@ -199,9 +186,7 @@ def test_package_root_exports_headline_interface_only() -> None:
         (
             tracing,
             [
-                "PayloadSerializer",
                 "TracePayloadMode",
-                "default_payload_serializer",
                 "mark_span_error",
                 "set_span_attributes",
                 "set_span_input",
@@ -219,6 +204,7 @@ def test_public_module_exports_are_stable(
 
 
 def test_concrete_public_modules_expose_expected_objects() -> None:
+    from graphobs.contracts.conformance import validate_update
     from graphobs.contracts.models import (
         Contract,
         ContractViolationAction,
@@ -230,18 +216,6 @@ def test_concrete_public_modules_expose_expected_objects() -> None:
         observe_payload,
         project_input,
         project_output,
-    )
-    from graphobs.contracts.validation import validate_update
-    from graphobs.discovery.draft import DiscoveredContract
-    from graphobs.discovery.drift import (
-        ContractDriftError,
-        assert_contract_amatches,
-        assert_contract_matches,
-    )
-    from graphobs.discovery.runner import (
-        ContractDiscoveryError,
-        adiscover_contract,
-        discover_contract,
     )
     from graphobs.langgraph.callbacks import (
         ProjectedCallbackHandler,
@@ -259,9 +233,7 @@ def test_concrete_public_modules_expose_expected_objects() -> None:
     from graphobs.payloads import shape_summary
     from graphobs.state.paths import state_diff
     from graphobs.tracing import (
-        PayloadSerializer,
         TracePayloadMode,
-        default_payload_serializer,
         mark_span_error,
         set_span_attributes,
         set_span_input,
@@ -270,28 +242,19 @@ def test_concrete_public_modules_expose_expected_objects() -> None:
     )
 
     assert Contract.__name__ == "Contract"
-    assert ContractDiscoveryError.__name__ == "ContractDiscoveryError"
-    assert issubclass(ContractDriftError, AssertionError)
-    assert callable(assert_contract_amatches)
-    assert callable(assert_contract_matches)
     assert ContractViolationAction.WARN.value == "warn"
     assert CorrelationFields.__name__ == "CorrelationFields"
-    assert DiscoveredContract.__name__ == "DiscoveredContract"
     assert GraphLogCallback.__name__ == "GraphLogCallback"
     assert InvokableGraph.__name__ == "InvokableGraph"
     assert LogContext.__name__ == "LogContext"
     assert NodeBuilder.__name__ == "NodeBuilder"
-    assert PayloadSerializer.__name__ == "PayloadSerializer"
     assert ProjectionStats.__name__ == "ProjectionStats"
     assert ProjectedCallbackHandler.__name__ == "ProjectedCallbackHandler"
     assert ProjectionPolicy.__name__ == "ProjectionPolicy"
     assert issubclass(StateContractError, ValueError)
     assert SubgraphContract.__name__ == "SubgraphContract"
     assert TracePayloadMode.COMPACT.value == "compact"
-    assert callable(adiscover_contract)
     assert callable(contract_subgraph)
-    assert callable(default_payload_serializer)
-    assert callable(discover_contract)
     assert callable(langgraph_input_schema)
     assert callable(mark_span_error)
     assert callable(project_callback_payloads)
@@ -311,9 +274,7 @@ def test_removed_names_are_not_available_from_package_root() -> None:
     removed_names = (
         "Contract",
         "ContractViolationAction",
-        "ContractDiscoveryError",
         "CorrelationFields",
-        "DiscoveredContract",
         "GraphLogCallback",
         "ProjectionPolicy",
         "ProjectionStats",
@@ -321,8 +282,6 @@ def test_removed_names_are_not_available_from_package_root() -> None:
         "StateContractError",
         "SubgraphContract",
         "TracePayloadMode",
-        "adiscover_contract",
-        "discover_contract",
         "observe_payload",
         "project_callback_payloads",
         "project_input",
